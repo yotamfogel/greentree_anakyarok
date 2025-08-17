@@ -1,0 +1,7 @@
+HOW TO RUN OFFLINE:
+1. Extract ZIP
+2. Install Node.js (installer in the zip)
+3. In the open project's terminal - run:
+npm run dev
+npm run build
+then open dist/index.html or localhost
