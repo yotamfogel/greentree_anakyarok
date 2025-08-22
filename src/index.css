@@ -527,6 +527,155 @@
     .fridge-panel { position: static; width: auto; height: auto; left: auto; top: auto; z-index: auto; }
     .app-main.full-screen.has-extractor .viz-section { margin-left: 0; }
   }
+
+  /* Value list panel (left of fridge) */
+  .value-panel {
+    position: fixed;
+    top: 120px;
+    left: 24px;
+    width: 420px;
+    height: calc(100vh - 144px);
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06)) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 20px 60px rgba(0,0,0,0.35) !important;
+    overflow: hidden;
+    z-index: 170; /* just below fridge */
+  }
+  .value-panel-inner { height: 100%; display: grid; grid-template-rows: auto 1fr; }
+  .value-search { padding: 10px; background: rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .value-search-row { display: flex; gap: 12px; align-items: center; }
+  .value-search-input {
+    flex: 1; background: transparent; border: 1px solid rgba(255,255,255,0.16); color: var(--text);
+    border-radius: 8px; padding: 8px 10px; outline: none;
+  }
+  .value-filter-dropdown {
+    position: relative;
+  }
+  .value-filter-dropdown .btn {
+    min-width: 120px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+  }
+  .value-filter-options {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius);
+    margin-top: 4px;
+    z-index: 1000;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    backdrop-filter: blur(8px);
+  }
+  .value-filter-option {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    transition: background 0.2s ease;
+    font-size: 14px;
+    color: #ffffff;
+    text-align: center;
+  }
+  .value-filter-option:last-child {
+    border-bottom: none;
+  }
+  .value-filter-option:hover {
+    background: rgba(255,255,255,0.08);
+  }
+  .value-filter-option.active {
+    background: rgba(124,192,255,0.16);
+    color: #7cc0ff;
+  }
+  .value-list { overflow: auto; padding: 10px; display: grid; gap: 8px; }
+  .value-item { background: rgba(255,255,255,0.06); border: none; border-radius: 10px; padding: 10px 8px 10px 12px; text-align: inherit; cursor: pointer; color: #ffffff; outline: none; }
+  .value-item:hover { border-color: rgba(124,192,255,0.4); box-shadow: 0 6px 18px rgba(124,192,255,0.18); }
+  .value-item.selected:not(.clicked) { 
+    border: 1px solid rgba(124, 192, 255, 0.6); 
+    background: rgba(124, 192, 255, 0.08); 
+    box-shadow: 0 0 12px rgba(124, 192, 255, 0.2);
+  }
+  .value-item.clicked { 
+    border: 2px solid rgba(0, 120, 255, 0.8); 
+    background: rgba(0, 120, 255, 0.1); 
+    box-shadow: 0 0 20px rgba(0, 120, 255, 0.4), 0 0 40px rgba(0, 120, 255, 0.2);
+  }
+  /* Ensure clicked fields completely override selected state with higher specificity */
+  .value-item.clicked.selected,
+  .value-item.selected.clicked { 
+    border: 2px solid rgba(0, 120, 255, 0.8) !important; 
+    background: rgba(0, 120, 255, 0.1) !important; 
+    box-shadow: 0 0 20px rgba(0, 120, 255, 0.4), 0 0 40px rgba(0, 120, 255, 0.2) !important;
+  }
+  .value-item:hover:not(.selected):not(.clicked) { 
+    border: 1px solid rgba(124, 192, 255, 0.6); 
+    background: rgba(124, 192, 255, 0.08); 
+    box-shadow: 0 0 12px rgba(124, 192, 255, 0.2);
+  }
+  
+  /* Remove any browser default focus outlines */
+  .value-item:focus,
+  .value-item:focus-visible,
+  .value-item:focus-within {
+    outline: none !important;
+    border: none !important;
+  }
+  
+  /* Force clicked fields to override everything else */
+  .value-item[class*="clicked"] { 
+    border: 2px solid rgba(0, 120, 255, 0.8) !important; 
+    background: rgba(0, 120, 255, 0.1) !important; 
+    box-shadow: 0 0 20px rgba(0, 120, 255, 0.4), 0 0 40px rgba(0, 120, 255, 0.2) !important;
+  }
+  
+  /* Ensure only one field can have the selected class at a time */
+  .value-item.selected:not(.clicked) { 
+    border: 1px solid rgba(124, 192, 255, 0.6); 
+    background: rgba(124, 192, 255, 0.08); 
+    box-shadow: 0 0 12px rgba(124, 192, 255, 0.2);
+  }
+  .value-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; direction: ltr; width: 100%; }
+  .value-name { font-weight: 800; color: #ffffff; text-align: right; flex: 0 0 auto; }
+  .value-hierarchy { font-size: 11px; color: #ffffff; opacity: 0.85; overflow-wrap: anywhere; flex: 1 1 auto; text-align: left; }
+  .value-type { font-size: 10px; color: var(--muted); border: 1px solid rgba(255,255,255,0.16); padding: 1px 6px; border-radius: 6px; }
+  @media (max-width: 1100px) { .value-panel { position: static; width: auto; height: auto; } }
+
+  /* Shift fridge to the right of value list only when value-panel exists.
+     We keep a default position and override via inline layout when needed. */
+  .fridge-panel { left: 24px; }
+
+  /* Value detail overlay */
+  /* Dictionary detail box layout */
+  .dictionary-box { position: fixed; top: 120px; right: 24px; bottom: 24px; left: 468px; /* wider left panel */
+    background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06)) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 28px; /* rounded corners to match template */
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 20px 60px rgba(0,0,0,0.35) !important;
+    padding: 16px 20px 20px 20px;
+    z-index: 300;
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    gap: 10px;
+    overflow: hidden;
+  }
+  .value-detail-headline { text-align: center; font-weight: 400; font-size: 30px; font-family: "Segoe UI" !important; }
+  .value-detail-headline::after { content: ''; display: block; height: 1px; margin-top: 8px; background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.28), rgba(255,255,255,0)); }
+  .value-detail-headline .value-detail-path { text-align: center; font-size: 16px; font-weight: 400; margin-top: 4px; color: var(--muted); }
+  .value-detail-body { margin-top: 6px; padding-inline: 8px; display: grid; gap: 20px; overflow: auto; }
+  .detail-row { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start; }
+  .detail-row .k { color: var(--muted); font-size: 18px; }
+  .detail-row .v { color: var(--text); font-size: 18px; }
+  .value-detail-actions { display: flex; justify-content: flex-end; }
+
+  /* Force Segoe UI for dictionary (מילון התקן) UI */
+  .value-panel, .value-panel *, .dictionary-box, .dictionary-box * {
+    font-family: "Segoe UI", Arial, sans-serif !important;
+  }
   .tree-node { --indent: 0px; display: grid; justify-items: center; overflow: visible; }
   .root-split { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 80px; width: 100%; }
   .root-col.left { display: grid; justify-items: end; }
@@ -1080,3 +1229,27 @@
     }
   }
 
+  /* Custom Scrollbar Styling */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f0f0f0;
+    border-radius: 4px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #0078d4;
+    border-radius: 4px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #005a9e;
+  }
+
+  /* Firefox scrollbar styling */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #0078d4 #f0f0f0;
+  }
