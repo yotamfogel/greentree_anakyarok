@@ -31,7 +31,7 @@ function flattenJsonSchema(schemaKey: string, schemaTitle: string, schema: any):
         }
       } else if (nodeType === 'array' && node?.items) {
         // Traverse into array items
-        visit(node.items, [...pathParts, '(item)'], requiredHint)
+        visit(node.items, [...pathParts, 'item'], requiredHint)
       } else {
         const name = pathParts[pathParts.length - 1] || schemaTitle
         const path = pathParts.join('.')
@@ -73,14 +73,28 @@ export function ValueList({ schemas }: ValueListProps) {
   const [filterType, setFilterType] = useState<'all' | 'fields' | 'hierarchies'>('all')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [selectedSchema, setSelectedSchema] = useState<string | null>('all')
+  const [isSchemaDropdownOpen, setIsSchemaDropdownOpen] = useState(false)
   const filterDropdownRef = useRef<HTMLDivElement>(null)
   const selectedFieldRef = useRef<HTMLButtonElement>(null)
+  const schemaDropdownRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+      // Don't interfere with navigation menu clicks
+      const target = event.target as Element
+      const isNavigationMenu = target.closest('.action-dropdown') || target.closest('.schema-dropdown')
+      
+      if (isNavigationMenu) {
+        return // Don't process navigation menu clicks
+      }
+      
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(target)) {
         setIsFilterOpen(false)
+      }
+      if (schemaDropdownRef.current && !schemaDropdownRef.current.contains(target)) {
+        setIsSchemaDropdownOpen(false)
       }
     }
 
@@ -104,16 +118,21 @@ export function ValueList({ schemas }: ValueListProps) {
   const filtered = useMemo(() => {
     let filteredFields = allFields
     
+    // Apply schema filter
+    if (selectedSchema && selectedSchema !== 'all') {
+      filteredFields = filteredFields.filter(f => f.schemaKey === selectedSchema)
+    }
+    
     // Apply type filter
     if (filterType === 'fields') {
-      filteredFields = allFields.filter(f => {
+      filteredFields = filteredFields.filter(f => {
         const parts = f.path.split('.')
-        return parts.length <= 2 // Only basic fields without children
+        return parts.length > 2 // Only fields with children (hierarchies)
       })
     } else if (filterType === 'hierarchies') {
-      filteredFields = allFields.filter(f => {
+      filteredFields = filteredFields.filter(f => {
         const parts = f.path.split('.')
-        return parts.length > 2 // Only parents with children
+        return parts.length <= 2 // Only basic fields without children
       })
     }
     // If filterType is 'all' (default), show all fields
@@ -128,7 +147,7 @@ export function ValueList({ schemas }: ValueListProps) {
       (f.type ? f.type.toLowerCase().includes(q) : false) ||
       (f.description ? f.description.toLowerCase().includes(q) : false)
     ))
-  }, [allFields, query, filterType])
+  }, [allFields, query, filterType, selectedSchema])
 
   // Keyboard navigation
   useEffect(() => {
@@ -197,10 +216,51 @@ export function ValueList({ schemas }: ValueListProps) {
       }}>
         <div className="value-panel-inner">
           <div className="value-search">
+            <div className="schema-selector" ref={schemaDropdownRef} style={{ marginBottom: '12px', width: '100%' }}>
+              <button 
+                className={`btn ghost ${selectedSchema ? '' : 'is-placeholder'}`} 
+                onClick={() => setIsSchemaDropdownOpen(!isSchemaDropdownOpen)}
+                style={{ width: '100%' }}
+              >
+                {selectedSchema === 'all' 
+                  ? 'כל התקנים'
+                  : selectedSchema && schemas[selectedSchema]
+                    ? schemas[selectedSchema].title
+                    : (
+                      <span className="schema-placeholder" dir="rtl">בחר תקן</span>
+                    )}
+                <span style={{ marginLeft: '8px' }}>▼</span>
+              </button>
+              {isSchemaDropdownOpen && (
+                <div className="schema-dropdown">
+                  <div
+                    className="schema-option"
+                    onClick={() => {
+                      setSelectedSchema('all')
+                      setIsSchemaDropdownOpen(false)
+                    }}
+                  >
+                    כל התקנים
+                  </div>
+                  {Object.entries(schemas).map(([key, schema]) => (
+                    <div
+                      key={key}
+                      className="schema-option"
+                      onClick={() => {
+                        setSelectedSchema(key)
+                        setIsSchemaDropdownOpen(false)
+                      }}
+                    >
+                      {schema.title}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="value-search-row">
               <input
                 type="text"
-                placeholder="חיפוש לפי שם/מסלול/סכמה..."
+                placeholder="חפש לפי שם/תיאור/היררכיה..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="value-search-input"
@@ -211,7 +271,7 @@ export function ValueList({ schemas }: ValueListProps) {
                   onClick={() => setIsFilterOpen(!isFilterOpen)}
                 >
                   <span>⏷</span>
-                  <span>{filterType === 'all' ? '' : filterType === 'fields' ? 'רק שדות בסיסיים' : 'רק היררכיות'}</span>
+                  <span>{filterType === 'all' ? 'הכל' : filterType === 'fields' ? 'רק שדות בסיסיים' : 'רק היררכיות'}</span>
                 </button>
                 {isFilterOpen && (
                   <div className="value-filter-options">
@@ -283,17 +343,30 @@ export function ValueList({ schemas }: ValueListProps) {
       }}>
         <div className="value-detail-headline">
           <div>ת"ז שדה</div>
-          <div className="value-detail-path">{selected ? (() => {
+          <div className={`value-detail-path ${selected ? 'selected' : ''}`}>{selected ? (() => {
             const parts = selected.path.split('.')
             if (parts.length <= 2) return selected.name
-            return `${parts.slice(1, parts.length - 1).join(' · ')} · ${selected.name}`
+            return `${parts.slice(1, parts.length - 1).join(' -> ')} -> ${selected.name}`
           })() : ''}</div>
         </div>
         <div className="value-detail-body">
           <div className="detail-row"><span className="k">מהות השדה:</span><span className="v">{selected?.description || '-'}</span></div>
           <div className="detail-row"><span className="k">סוג השדה:</span><span className="v">{selected?.type || '-'}</span></div>
           <div className="detail-row"><span className="k">האם שדה חובה:</span><span className="v">{selected?.rules?.some(r => r === 'required') ? 'כן' : 'לא'}</span></div>
-          <div className="detail-row"><span className="k">דג"ח/רשימה סגורה:</span><span className="v">{selected?.rules?.find(r => r.startsWith('enum')) || '-'}</span></div>
+          <div className="detail-row"><span className="k">דג"ח/רשימה סגורה:</span><span className="v">{selected?.rules?.find(r => r.startsWith('enum')) ? (() => {
+            const enumRule = selected.rules.find(r => r.startsWith('enum'))
+            if (enumRule) {
+              const enumValues = enumRule.replace('enum: ', '').split(', ')
+              return (
+                <div className="enum-values">
+                  {enumValues.map((value, index) => (
+                    <div key={index} className="enum-value">{value}</div>
+                  ))}
+                </div>
+              )
+            }
+            return '-'
+          })() : '-'}</span></div>
           <div className="detail-row"><span className="k">חוקים:</span><span className="v">{selected?.rules && selected.rules.length ? selected.rules.join(' | ') : '-'}</span></div>
           <div className="detail-row"><span className="k">בשימוש במשפחות:</span><span className="v">{selected ? (() => {
             const schemas = new Set<string>()

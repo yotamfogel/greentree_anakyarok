@@ -367,22 +367,51 @@ export function StandardDictionary() {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [selectedSchema, setSelectedSchema] = useState<string>('')
   const [isSchemaDropdownOpen, setIsSchemaDropdownOpen] = useState<boolean>(false)
-  const [fields] = useState([
-    { id: 1, name: 'שם השדה', description: 'תיאור השדה הראשון' },
-    { id: 2, name: 'שדה נוסף', description: 'תיאור השדה השני' },
-    { id: 3, name: 'שדה שלישי', description: 'תיאור השדה השלישי' },
-    { id: 4, name: 'שדה רביעי', description: 'תיאור השדה הרביעי' },
-    { id: 5, name: 'שדה חמישי', description: 'תיאור השדה החמישי' },
-    { id: 6, name: 'שדה שישי', description: 'תיאור השדה השישי' },
-    { id: 7, name: 'שדה שביעי', description: 'תיאור השדה השביעי' },
-    { id: 8, name: 'שדה שמיני', description: 'תיאור השדה השמיני' },
-    { id: 9, name: 'שדה תשיעי', description: 'תיאור השדה התשיעי' },
-    { id: 10, name: 'שדה עשירי', description: 'תיאור השדה העשירי' }
-  ])
+  const [fields, setFields] = useState<Array<{id: string, name: string, description: string, path: string}>>([])
   
   const containerRef = useRef<HTMLDivElement>(null)
   const selectedFieldRef = useRef<HTMLDivElement>(null)
   const schemaDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Function to extract fields from schema recursively
+  const extractFieldsFromSchema = (schema: any, path: string = ''): Array<{id: string, name: string, description: string, path: string}> => {
+    const fields: Array<{id: string, name: string, description: string, path: string}> = []
+    
+    if (schema.properties) {
+      Object.entries(schema.properties).forEach(([key, value]: [string, any]) => {
+        const currentPath = path ? `${path}.${key}` : key
+        const fieldName = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
+        
+        if (value.type === 'object' && value.properties) {
+          // Recursively extract nested object fields
+          fields.push(...extractFieldsFromSchema(value, currentPath))
+        } else {
+          // Add leaf field
+          fields.push({
+            id: currentPath,
+            name: fieldName,
+            description: value.description || 'No description available',
+            path: currentPath
+          })
+        }
+      })
+    }
+    
+    return fields
+  }
+
+  // Update fields when schema changes
+  useEffect(() => {
+    if (selectedSchema && availableSchemas[selectedSchema as keyof typeof availableSchemas]) {
+      const schema = availableSchemas[selectedSchema as keyof typeof availableSchemas].schema
+      const extractedFields = extractFieldsFromSchema(schema)
+      setFields(extractedFields)
+      setSelectedIndex(0) // Reset selection to first field
+    } else {
+      setFields([])
+      setSelectedIndex(0)
+    }
+  }, [selectedSchema])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -397,6 +426,8 @@ export function StandardDictionary() {
   }, [])
 
   const handleKeyDown = (event: KeyboardEvent) => {
+    if (fields.length === 0) return
+    
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault()
@@ -519,37 +550,56 @@ export function StandardDictionary() {
               }}
               className="custom-scrollbar"
             >
-              {fields.map((field, index) => (
-                <div
-                  key={field.id}
-                  ref={index === selectedIndex ? selectedFieldRef : null}
-                  style={{
-                    padding: '12px 16px',
-                    border: index === selectedIndex ? '2px solid #0078d4' : '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '8px',
-                    backgroundColor: index === selectedIndex ? 'rgba(0, 120, 212, 0.1)' : 'var(--panel)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif',
-                    boxShadow: index === selectedIndex ? '0 0 20px rgba(0, 120, 212, 0.6), 0 0 40px rgba(0, 120, 212, 0.3)' : 'none'
-                  }}
-                  onClick={() => setSelectedIndex(index)}
-                >
-                  <div style={{ 
-                    fontWeight: 'bold', 
-                    marginBottom: '4px',
-                    color: index === selectedIndex ? '#0078d4' : 'var(--text)'
-                  }}>
-                    {field.name}
-                  </div>
-                  <div style={{ 
-                    fontSize: '14px',
-                    color: index === selectedIndex ? '#005a9e' : 'var(--muted)'
-                  }}>
-                    {field.description}
-                  </div>
+              {fields.length === 0 ? (
+                <div style={{
+                  padding: '24px',
+                  textAlign: 'center',
+                  color: 'var(--muted)',
+                  fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif'
+                }}>
+                  {selectedSchema ? 'אין שדות זמינים בתקן זה' : 'בחר תקן כדי לצפות בשדות'}
                 </div>
-              ))}
+              ) : (
+                fields.map((field, index) => (
+                  <div
+                    key={field.id}
+                    ref={index === selectedIndex ? selectedFieldRef : null}
+                    style={{
+                      padding: '12px 16px',
+                      border: index === selectedIndex ? '2px solid #0078d4' : '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '8px',
+                      backgroundColor: index === selectedIndex ? 'rgba(0, 120, 212, 0.1)' : 'var(--panel)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif',
+                      boxShadow: index === selectedIndex ? '0 0 20px rgba(0, 120, 212, 0.6), 0 0 40px rgba(0, 120, 212, 0.3)' : 'none'
+                    }}
+                    onClick={() => setSelectedIndex(index)}
+                  >
+                    <div style={{ 
+                      fontWeight: 'bold', 
+                      marginBottom: '4px',
+                      color: index === selectedIndex ? '#0078d4' : 'var(--text)'
+                    }}>
+                      {field.name}
+                    </div>
+                    <div style={{ 
+                      fontSize: '12px',
+                      color: index === selectedIndex ? '#005a9e' : 'var(--muted)',
+                      marginBottom: '4px',
+                      fontFamily: 'monospace'
+                    }}>
+                      {field.path}
+                    </div>
+                    <div style={{ 
+                      fontSize: '14px',
+                      color: index === selectedIndex ? '#005a9e' : 'var(--muted)'
+                    }}>
+                      {field.description}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
             <div style={{ 
               marginTop: '16px', 

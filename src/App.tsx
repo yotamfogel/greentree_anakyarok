@@ -4,6 +4,8 @@ import { TreeView } from './components/TreeView'
 import { DynamicConnectors } from './components/DynamicConnectors'
 import { ExcelExtractor } from './components/ExcelExtractor'
 import { ValueList } from './components/ValueList'
+import { SagachimManager } from './components/SagachimManager'
+
 
 const sampleJson = `{
   "person": {
@@ -140,7 +142,7 @@ interface MappingData {
 type ToastType = 'ok' | 'warn' | 'error'
 
 export default function App() {
-  const [activeScreen, setActiveScreen] = useState<'viz' | 'dictionary'>('viz')
+  const [activeScreen, setActiveScreen] = useState<'viz' | 'dictionary' | 'common'>('viz')
   const [rawInput, setRawInput] = useState<string>(sampleJson)
   const [tree, setTree] = useState<TreeNodeData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -866,7 +868,10 @@ export default function App() {
       if (downloadMenuRef.current && !downloadMenuRef.current.contains(target)) {
         setIsDownloadMenuOpen(false)
       }
-      if (navMenuRef.current && !navMenuRef.current.contains(target)) {
+      // For nav menu, also check if clicking on the fixed-position dropdown
+      const isNavButton = navMenuRef.current && navMenuRef.current.contains(target)
+      const isNavDropdown = (target as Element)?.closest?.('.schema-dropdown[role="menu"]')
+      if (!isNavButton && !isNavDropdown) {
         setIsNavOpen(false)
       }
     }
@@ -1361,8 +1366,9 @@ export default function App() {
                     <div 
                       className="schema-option opt-orange"
                       onClick={() => { window.dispatchEvent(new Event('excel:upload-mapping-request')); setIsUploadMenuOpen(false) }}
+                      dir="rtl"
                     >
-                      העלה מאפינג
+                      העלה Mapping
                     </div>
                     <div 
                       className="schema-option opt-orange"
@@ -1394,15 +1400,16 @@ export default function App() {
                           return
                         }
                         if (unmappedRequiredLeaves.length > 0) {
-                          setShowMissingRequiredModal(true)
+                          window.dispatchEvent(new Event('excel:download-mapping-request'))
                           setIsDownloadMenuOpen(false)
                           return
                         }
                         window.dispatchEvent(new Event('excel:download-mapping-request'))
                         setIsDownloadMenuOpen(false)
                       }}
+                      dir="rtl"
                     >
-                      הורד מאפינג
+                      הורד Mapping
                     </div>
                     <div 
                       className="schema-option opt-green"
@@ -1415,8 +1422,10 @@ export default function App() {
               </div>
             </div>
             )}
+
           </div>
           <div className="header-actions">
+
             {activeScreen === 'viz' && (
               <div className="schema-group" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div className="schema-selector">
@@ -1459,6 +1468,7 @@ export default function App() {
                 </div>
               </>
             )}
+
             {/* Dropdown anchored to the actions area */}
             <div ref={inputDropdownRef} className={`input-dropdown anchored ${showInput ? 'open' : ''}`}>
               <div className="panel input dropdown">
@@ -1483,13 +1493,28 @@ export default function App() {
               </div>
             </div>
 
+            {/* Notification Button - Only visible on shared space screen */}
+            {activeScreen === 'common' && (
+              <div className="notification-container">
+                <button className="notification-btn" onClick={() => console.log('Notifications clicked')}>
+                  <svg className="notification-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                  </svg>
+                  <span className="notification-count">3</span>
+                </button>
+              </div>
+            )}
+
             {/* Navigation hamburger */}
             <div className="action-dropdown" ref={navMenuRef} style={{ position: 'relative' }}>
               <button
                 className="btn ghost"
                 aria-haspopup="menu"
                 aria-expanded={isNavOpen ? 'true' : 'false'}
-                onClick={() => setIsNavOpen(!isNavOpen)}
+                onClick={() => {
+                  console.log('Hamburger clicked, current isNavOpen:', isNavOpen, 'activeScreen:', activeScreen)
+                  setIsNavOpen(!isNavOpen)
+                }}
                 title="ניווט"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -1499,33 +1524,108 @@ export default function App() {
                 </svg>
               </button>
               {isNavOpen && (
-                <div className="schema-dropdown" style={{ right: 0, left: 'auto', minWidth: 220 }} role="menu" dir="rtl">
+                <div 
+                  className="schema-dropdown" 
+                  style={{ 
+                    right: 0, 
+                    left: 'auto', 
+                    minWidth: 220,
+                    position: 'absolute'
+                  }} 
+                  role="menu" 
+                  dir="rtl"
+                >
+                  <div style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--muted)', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
+                    Debug: Menu open, activeScreen: {activeScreen}
+                  </div>
                   <div
                     className="schema-option"
                     role="menuitem"
                     onClick={() => {
+                      console.log('Clicking viz option')
                       setActiveScreen('viz')
                       setIsNavOpen(false)
                       setIsUploadMenuOpen(false)
                       setIsDownloadMenuOpen(false)
                       setIsSchemaDropdownOpen(false)
                     }}
+                    onMouseEnter={() => console.log('Hovering over viz option')}
+                    onMouseLeave={() => console.log('Leaving viz option')}
+                    style={{ 
+                      position: 'relative',
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid rgba(255,255,255,0.06)',
+                      transition: 'background 0.2s ease',
+                      fontSize: '14px',
+                      color: '#ffffff',
+                      textAlign: 'center',
+                      pointerEvents: 'auto',
+                      zIndex: 9999999
+                    }}
                   >
-                    ויזואליזציה וMapping
+                    ויואליזציה + Mapping
+                    <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
                   </div>
                   <div
                     className="schema-option"
                     role="menuitem"
                     onClick={() => {
+                      console.log('Clicking dictionary option')
                       setActiveScreen('dictionary')
                       setIsNavOpen(false)
                       setIsUploadMenuOpen(false)
                       setIsDownloadMenuOpen(false)
                       setIsSchemaDropdownOpen(false)
                     }}
+                    onMouseEnter={() => console.log('Hovering over dictionary option')}
+                    onMouseLeave={() => console.log('Leaving dictionary option')}
+                    style={{ 
+                      position: 'relative',
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid rgba(255,255,255,0.06)',
+                      transition: 'background 0.2s ease',
+                      fontSize: '14px',
+                      color: '#ffffff',
+                      textAlign: 'center',
+                      pointerEvents: 'auto',
+                      zIndex: 9999999
+                    }}
                   >
                     מילון התקן
+                    <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
                   </div>
+                  <div
+                    className="schema-option"
+                    role="menuitem"
+                    onClick={() => {
+                      console.log('Clicking common option')
+                      setActiveScreen('common')
+                      setIsNavOpen(false)
+                      setIsUploadMenuOpen(false)
+                      setIsDownloadMenuOpen(false)
+                      setIsSchemaDropdownOpen(false)
+                    }}
+                    onMouseEnter={() => console.log('Hovering over common option')}
+                    onMouseLeave={() => console.log('Leaving common option')}
+                    style={{ 
+                      position: 'relative',
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid rgba(255,255,255,0.06)',
+                      transition: 'background 0.2s ease',
+                      fontSize: '14px',
+                      color: '#ffffff',
+                      textAlign: 'center',
+                      pointerEvents: 'auto',
+                      zIndex: 9999999
+                    }}
+                  >
+                    המרחב המשותף
+                    <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
+                  </div>
+
                 </div>
               )}
             </div>
@@ -1597,9 +1697,11 @@ export default function App() {
             </div>
           </section>
         </main>
-        ) : (
+        ) : activeScreen === 'dictionary' ? (
           <ValueList schemas={availableSchemas as any} />
-        )}
+        ) : activeScreen === 'common' ? (
+          <SagachimManager />
+        ) : null}
 
         {/* Required fields floating panel */}
         {activeScreen === 'viz' && tree && (
