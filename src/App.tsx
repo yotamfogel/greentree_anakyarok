@@ -5,6 +5,14 @@ import { DynamicConnectors } from './components/DynamicConnectors'
 import { ExcelExtractor } from './components/ExcelExtractor'
 import { ValueList } from './components/ValueList'
 import { SagachimManager } from './components/SagachimManager'
+import { SagachimStatus } from './components/SagachimStatus'
+import { PermissionProvider } from './contexts/PermissionContext'
+import { SagachDataProvider } from './contexts/SagachDataContext'
+import { LoginModal } from './components/LoginModal'
+import { UserStatus } from './components/UserStatus'
+import { PermissionManager } from './components/PermissionManager'
+import { usePermissions } from './contexts/PermissionContext'
+import ErrorBoundary from './components/ErrorBoundary'
 
 
 const sampleJson = `{
@@ -141,8 +149,20 @@ interface MappingData {
 
 type ToastType = 'ok' | 'warn' | 'error'
 
-export default function App() {
-  const [activeScreen, setActiveScreen] = useState<'viz' | 'dictionary' | 'common'>('viz')
+function AppContent() {
+  const { user, isLoading, canManageUsers } = usePermissions()
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [showPermissionManager, setShowPermissionManager] = useState(false)
+  const [activeScreen, setActiveScreen] = useState<'viz' | 'dictionary' | 'common' | 'status'>('status')
+
+  // Redirect non-admin users away from restricted screens
+  useEffect(() => {
+    if (user && user.role !== 'admin') {
+      if (activeScreen === 'viz' || activeScreen === 'dictionary' || activeScreen === 'common') {
+        setActiveScreen('status')
+      }
+    }
+  }, [user, activeScreen])
   const [rawInput, setRawInput] = useState<string>(sampleJson)
   const [tree, setTree] = useState<TreeNodeData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -210,20 +230,20 @@ export default function App() {
     }
   }, [rawInput])
 
-  // Compute list of unmapped mandatory leaf fields (required or conditional)
+  // Compute list of unmapped mandatory leaf fields (required only)
   const unmappedMandatoryLeaves = useMemo(() => {
-    if (!tree) return [] as Array<{ id: string; path: string; requiredState: 'required' | 'conditional' }>
-    const results: Array<{ id: string; path: string; requiredState: 'required' | 'conditional' }> = []
+    if (!tree) return [] as Array<{ id: string; path: string; requiredState: 'required' }>
+    const results: Array<{ id: string; path: string; requiredState: 'required' }> = []
     const walk = (n: TreeNodeData, ancestors: string[]) => {
       const children = n.children ?? []
       const isLeaf = children.length === 0
       const isMapped = !!(n.excelMeta && Object.keys(n.excelMeta).length > 0)
-      const isMandatory = n.requiredState === 'required' || n.requiredState === 'conditional'
+      const isMandatory = n.requiredState === 'required'
       const pathNames = [...ancestors, n.name]
       if (isLeaf && isMandatory && !isMapped) {
         // Remove the root cube's name from the displayed path
         const displayPath = pathNames.slice(1).join(' -> ')
-        results.push({ id: n.id, path: displayPath, requiredState: n.requiredState as 'required' | 'conditional' })
+        results.push({ id: n.id, path: displayPath, requiredState: n.requiredState as 'required' })
       }
       children.forEach((c) => walk(c, pathNames))
     }
@@ -233,7 +253,7 @@ export default function App() {
 
   // Show only truly mandatory (red) fields in the right-side panel
   const unmappedRequiredLeaves = useMemo(() => {
-    return unmappedMandatoryLeaves.filter((x) => x.requiredState === 'required')
+    return unmappedMandatoryLeaves
   }, [unmappedMandatoryLeaves])
 
   const onVisualize = () => {
@@ -1350,13 +1370,13 @@ export default function App() {
         <header className="app-header floating">
           <div className="brand">
             <img src="./images/logo.png" alt="העץ הירוק" style={{ height: '80px', width: '80px', objectFit: 'contain', marginRight: '8px', marginTop: '-12px', marginBottom: '-12px' }} />
-            {activeScreen === 'viz' && (
+            {activeScreen === 'viz' && user?.role === 'admin' && (
             <div className="excel-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* Upload dropdown */}
               <div className="action-dropdown" ref={uploadMenuRef} style={{ position: 'relative', width: 240 }}>
                 <button 
                   className="btn glow-orange"
-                  style={{ width: '100%' }}
+                  style={{ width: '100%', padding: '12px 14px', minHeight: '48px' }}
                   onClick={() => { setIsUploadMenuOpen(!isUploadMenuOpen); setIsDownloadMenuOpen(false) }}
                 >
                   העלאה <span style={{ marginLeft: 6 }}>▼</span>
@@ -1384,7 +1404,7 @@ export default function App() {
               <div className="action-dropdown" ref={downloadMenuRef} style={{ position: 'relative', width: 240 }}>
                 <button 
                   className="btn glow-green"
-                  style={{ width: '100%' }}
+                  style={{ width: '100%', padding: '12px 14px', minHeight: '48px' }}
                   onClick={() => { setIsDownloadMenuOpen(!isDownloadMenuOpen); setIsUploadMenuOpen(false) }}
                 >
                   הורדה <span style={{ marginLeft: 6 }}>▼</span>
@@ -1425,8 +1445,67 @@ export default function App() {
 
           </div>
           <div className="header-actions">
+            {/* User authentication section */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {user ? (
+                <>
+                  <UserStatus />
+                  {canManageUsers() && (
+                    <button
+                      onClick={() => setShowPermissionManager(true)}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: 'rgba(255, 165, 0, 0.2)',
+                        color: '#ffa500',
+                        border: '1px solid rgba(255, 165, 0, 0.4)',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontFamily: 'Segoe UI, Arial, sans-serif',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        direction: 'rtl',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 165, 0, 0.3)'
+                        e.currentTarget.style.borderColor = 'rgba(255, 165, 0, 0.6)'
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 165, 0, 0.2)'
+                        e.currentTarget.style.borderColor = 'rgba(255, 165, 0, 0.4)'
+                      }}
+                    >
+                      <span>⚙️</span>
+                      ניהול הרשאות
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button
+                  onClick={() => setShowLoginModal(true)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: 'var(--accent)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontFamily: 'Segoe UI, Arial, sans-serif',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                    direction: 'rtl'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-hover)'}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'var(--accent)'}
+                >
+                  התחבר
+                </button>
+              )}
+            </div>
 
-            {activeScreen === 'viz' && (
+            {activeScreen === 'viz' && user?.role === 'admin' && (
               <div className="schema-group" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div className="schema-selector">
                   <button 
@@ -1459,42 +1538,44 @@ export default function App() {
                 </div>
               </div>
             )}
-            {activeScreen === 'viz' && (
+            {activeScreen === 'viz' && user?.role === 'admin' && (
               <>
-                <button className="btn ghost" onClick={onClear}>נקה</button>
-                <button className="btn primary" onClick={onVisualize}>ויזואליזציה</button>
+                <button className="btn ghost" onClick={onClear} style={{ padding: '12px 14px', minHeight: '48px' }}>נקה</button>
+                <button className="btn primary" onClick={onVisualize} style={{ padding: '12px 14px', minHeight: '48px' }}>ויזואליזציה</button>
                 <div className="zoom-controls">
                   <div className="zoom-readout">{Math.round(zoom * 100)}%</div>
                 </div>
               </>
             )}
 
-            {/* Dropdown anchored to the actions area */}
-            <div ref={inputDropdownRef} className={`input-dropdown anchored ${showInput ? 'open' : ''}`}>
-              <div className="panel input dropdown">
-                <div className="panel-title">קלט JSON</div>
-                                  <textarea
-                    className="json-input"
-                    spellCheck={false}
-                    placeholder="הדבק JSON כאן..."
-                    value={rawInput}
-                    onChange={(e) => setRawInput(e.target.value)}
-                  />
-                <div className="panel-footer">
-                  {error ? (
-                    <div className="notice error">{error}</div>
-                  ) : (
-                    <div className="notice ok">{parsedPreview ? `זוהה: ${parsedPreview}` : 'ממתין ל-JSON תקין...'}</div>
-                  )}
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn primary" onClick={onVisualize}>ויזואליזציה</button>
+            {/* Dropdown anchored to the actions area - Admin only */}
+            {user?.role === 'admin' && (
+              <div ref={inputDropdownRef} className={`input-dropdown anchored ${showInput ? 'open' : ''}`}>
+                <div className="panel input dropdown">
+                  <div className="panel-title">קלט JSON</div>
+                                    <textarea
+                      className="json-input"
+                      spellCheck={false}
+                      placeholder="הדבק JSON כאן..."
+                      value={rawInput}
+                      onChange={(e) => setRawInput(e.target.value)}
+                    />
+                  <div className="panel-footer">
+                    {error ? (
+                      <div className="notice error">{error}</div>
+                    ) : (
+                      <div className="notice ok">{parsedPreview ? `זוהה: ${parsedPreview}` : 'ממתין ל-JSON תקין...'}</div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn primary" onClick={onVisualize} style={{ padding: '12px 14px', minHeight: '48px' }}>ויזואליזציה</button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Notification Button - Only visible on shared space screen */}
-            {activeScreen === 'common' && (
+            {/* Notification Button - Only visible on shared space screen for admins */}
+            {activeScreen === 'common' && user?.role === 'admin' && (
               <div className="notification-container">
                 <button className="notification-btn" onClick={() => console.log('Notifications clicked')}>
                   <svg className="notification-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -1535,22 +1616,113 @@ export default function App() {
                   role="menu" 
                   dir="rtl"
                 >
-                  <div style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--muted)', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                    Debug: Menu open, activeScreen: {activeScreen}
-                  </div>
+                  
+                  {user?.role === 'admin' && (
+                    <div
+                      className="schema-option"
+                      role="menuitem"
+                      onClick={() => {
+                        console.log('Clicking viz option')
+                        setActiveScreen('viz')
+                        setIsNavOpen(false)
+                        setIsUploadMenuOpen(false)
+                        setIsDownloadMenuOpen(false)
+                        setIsSchemaDropdownOpen(false)
+                      }}
+                      onMouseEnter={() => console.log('Hovering over viz option')}
+                      onMouseLeave={() => console.log('Leaving viz option')}
+                      style={{ 
+                        position: 'relative',
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid rgba(255,255,255,0.06)',
+                        transition: 'background 0.2s ease',
+                        fontSize: '14px',
+                        color: '#ffffff',
+                        textAlign: 'center',
+                        pointerEvents: 'auto',
+                        zIndex: 9999999
+                      }}
+                    >
+                      ויואליזציה + Mapping
+                      <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
+                    </div>
+                  )}
+                  {user?.role === 'admin' && (
+                    <div
+                      className="schema-option"
+                      role="menuitem"
+                      onClick={() => {
+                        console.log('Clicking dictionary option')
+                        setActiveScreen('dictionary')
+                        setIsNavOpen(false)
+                        setIsUploadMenuOpen(false)
+                        setIsDownloadMenuOpen(false)
+                        setIsSchemaDropdownOpen(false)
+                      }}
+                      onMouseEnter={() => console.log('Hovering over dictionary option')}
+                      onMouseLeave={() => console.log('Leaving dictionary option')}
+                      style={{ 
+                        position: 'relative',
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid rgba(255,255,255,0.06)',
+                        transition: 'background 0.2s ease',
+                        fontSize: '14px',
+                        color: '#ffffff',
+                        textAlign: 'center',
+                        pointerEvents: 'auto',
+                        zIndex: 9999999
+                      }}
+                    >
+                      מילון התקן
+                      <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
+                    </div>
+                  )}
+                  {user?.role === 'admin' && (
+                    <div
+                      className="schema-option"
+                      role="menuitem"
+                      onClick={() => {
+                        console.log('Clicking common option')
+                        setActiveScreen('common')
+                        setIsNavOpen(false)
+                        setIsUploadMenuOpen(false)
+                        setIsDownloadMenuOpen(false)
+                        setIsSchemaDropdownOpen(false)
+                      }}
+                      onMouseEnter={() => console.log('Hovering over common option')}
+                      onMouseLeave={() => console.log('Leaving common option')}
+                      style={{ 
+                        position: 'relative',
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid rgba(255,255,255,0.06)',
+                        transition: 'background 0.2s ease',
+                        fontSize: '14px',
+                        color: '#ffffff',
+                        textAlign: 'center',
+                        pointerEvents: 'auto',
+                        zIndex: 9999999
+                      }}
+                    >
+                      המרחב המשותף
+                      <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
+                    </div>
+                  )}
                   <div
                     className="schema-option"
                     role="menuitem"
                     onClick={() => {
-                      console.log('Clicking viz option')
-                      setActiveScreen('viz')
+                      console.log('Clicking status option')
+                      setActiveScreen('status')
                       setIsNavOpen(false)
                       setIsUploadMenuOpen(false)
                       setIsDownloadMenuOpen(false)
                       setIsSchemaDropdownOpen(false)
                     }}
-                    onMouseEnter={() => console.log('Hovering over viz option')}
-                    onMouseLeave={() => console.log('Leaving viz option')}
+                    onMouseEnter={() => console.log('Hovering over status option')}
+                    onMouseLeave={() => console.log('Leaving status option')}
                     style={{ 
                       position: 'relative',
                       padding: '8px 12px',
@@ -1564,65 +1736,7 @@ export default function App() {
                       zIndex: 9999999
                     }}
                   >
-                    ויואליזציה + Mapping
-                    <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
-                  </div>
-                  <div
-                    className="schema-option"
-                    role="menuitem"
-                    onClick={() => {
-                      console.log('Clicking dictionary option')
-                      setActiveScreen('dictionary')
-                      setIsNavOpen(false)
-                      setIsUploadMenuOpen(false)
-                      setIsDownloadMenuOpen(false)
-                      setIsSchemaDropdownOpen(false)
-                    }}
-                    onMouseEnter={() => console.log('Hovering over dictionary option')}
-                    onMouseLeave={() => console.log('Leaving dictionary option')}
-                    style={{ 
-                      position: 'relative',
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid rgba(255,255,255,0.06)',
-                      transition: 'background 0.2s ease',
-                      fontSize: '14px',
-                      color: '#ffffff',
-                      textAlign: 'center',
-                      pointerEvents: 'auto',
-                      zIndex: 9999999
-                    }}
-                  >
-                    מילון התקן
-                    <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
-                  </div>
-                  <div
-                    className="schema-option"
-                    role="menuitem"
-                    onClick={() => {
-                      console.log('Clicking common option')
-                      setActiveScreen('common')
-                      setIsNavOpen(false)
-                      setIsUploadMenuOpen(false)
-                      setIsDownloadMenuOpen(false)
-                      setIsSchemaDropdownOpen(false)
-                    }}
-                    onMouseEnter={() => console.log('Hovering over common option')}
-                    onMouseLeave={() => console.log('Leaving common option')}
-                    style={{ 
-                      position: 'relative',
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid rgba(255,255,255,0.06)',
-                      transition: 'background 0.2s ease',
-                      fontSize: '14px',
-                      color: '#ffffff',
-                      textAlign: 'center',
-                      pointerEvents: 'auto',
-                      zIndex: 9999999
-                    }}
-                  >
-                    המרחב המשותף
+                    סטטוס סג"חים
                     <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
                   </div>
 
@@ -1632,7 +1746,7 @@ export default function App() {
           </div>
         </header>
 
-        {activeScreen === 'viz' ? (
+        {activeScreen === 'viz' && user?.role === 'admin' ? (
         <main className="app-main full-screen has-extractor">
           <ExcelExtractor />
           {isSearchVisible && (
@@ -1697,14 +1811,79 @@ export default function App() {
             </div>
           </section>
         </main>
-        ) : activeScreen === 'dictionary' ? (
+        ) : activeScreen === 'dictionary' && user?.role === 'admin' ? (
           <ValueList schemas={availableSchemas as any} />
-        ) : activeScreen === 'common' ? (
+        ) : activeScreen === 'common' && user?.role === 'admin' ? (
           <SagachimManager />
+        ) : activeScreen === 'status' ? (
+          <SagachimStatus />
+        ) : user && user.role !== 'admin' ? (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100vh',
+            padding: '40px',
+            textAlign: 'center',
+            direction: 'rtl'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(255,165,0,0.1), rgba(255,165,0,0.05))',
+              border: '1px solid rgba(255,165,0,0.3)',
+              borderRadius: '16px',
+              padding: '40px',
+              maxWidth: '600px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{
+                fontSize: '48px',
+                marginBottom: '20px',
+                color: 'var(--accent)'
+              }}>
+                🔒
+              </div>
+              <h2 style={{
+                color: 'var(--text)',
+                fontSize: '24px',
+                fontWeight: '600',
+                marginBottom: '16px'
+              }}>
+                גישה מוגבלת
+              </h2>
+              <p style={{
+                color: 'var(--muted)',
+                fontSize: '16px',
+                lineHeight: '1.6',
+                marginBottom: '24px'
+              }}>
+                רק מנהלים יכולים לגשת למסכי העץ, הבנק והמרחב המשותף. 
+                <br />
+                אתה יכול לגשת למסך סטטוס הסג"חים בלבד.
+              </p>
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'center',
+                flexWrap: 'wrap'
+              }}>
+                <div style={{
+                  background: 'rgba(124,192,255,0.1)',
+                  border: '1px solid rgba(124,192,255,0.3)',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  fontSize: '14px',
+                  color: 'var(--accent)'
+                }}>
+                  <strong>תפקיד נוכחי:</strong> {user.role === 'viewer' ? 'צופה' : user.role === 'editor' ? 'עורך' : 'מנהל'}
+                </div>
+              </div>
+            </div>
+          </div>
         ) : null}
 
-        {/* Required fields floating panel */}
-        {activeScreen === 'viz' && tree && (
+        {/* Required fields floating panel - Admin only */}
+        {activeScreen === 'viz' && tree && user?.role === 'admin' && (
           <div className={`required-panel ${requiredPanelOpen ? 'open' : 'collapsed'}`}>
             <div className="required-header" dir="rtl" onClick={() => setRequiredPanelOpen(o => !o)}>
               <div className="required-title">שדות חובה בתקן:</div>
@@ -1932,7 +2111,31 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal} 
+        onClose={() => setShowLoginModal(false)} 
+      />
+
+      {/* Permission Manager Modal */}
+      <PermissionManager 
+        isOpen={showPermissionManager} 
+        onClose={() => setShowPermissionManager(false)} 
+      />
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <PermissionProvider>
+        <SagachDataProvider>
+          <AppContent />
+        </SagachDataProvider>
+      </PermissionProvider>
+    </ErrorBoundary>
   )
 }
 

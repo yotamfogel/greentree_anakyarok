@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSagachData } from '../contexts/SagachDataContext'
 
 interface SagachItem {
   id: string
@@ -22,91 +23,20 @@ interface SagachTable {
 }
 
 export const SagachimManager = () => {
-  const [currentSagachs, setCurrentSagachs] = useState<SagachTable[]>([
-    {
-      id: 'sagach1',
-      name: 'סג"ח ראשי',
-      currentVersion: '1.0.4',
-      data: [
-        { id: '1', 'Column 1': 'חדש', 'Column 2': 'string', 'Column 3': '14/07/2024', 'Column 4': 'eventTime' },
-        { id: '2', 'Column 1': 'ID', 'Column 2': 'String', 'Column 3': '432423423', 'Column 4': 'Id' },
-        { id: '3', 'Column 1': 'טלפון', 'Column 2': 'String', 'Column 3': '9728549308', 'Column 4': 'Pstn' },
-        { id: '4', 'Column 1': 'סים', 'Column 2': 'string', 'Column 3': '4580432942', 'Column 4': 'imsi' }
-      ],
-      versions: [
-        {
-          version: '1.0.4',
-          date: '24/08/2025',
-          time: '10:05',
-          data: [
-            { id: '1', 'Column 1': 'חדש', 'Column 2': 'string', 'Column 3': '14/07/2024', 'Column 4': 'eventTime' },
-            { id: '2', 'Column 1': 'ID', 'Column 2': 'String', 'Column 3': '432423423', 'Column 4': 'Id' },
-            { id: '3', 'Column 1': 'טלפון', 'Column 2': 'String', 'Column 3': '9728549308', 'Column 4': 'Pstn' },
-            { id: '4', 'Column 1': 'סים', 'Column 2': 'string', 'Column 3': '4580432942', 'Column 4': 'imsi' }
-          ]
-        },
-        {
-          version: '1.0.3',
-          date: '24/08/2025',
-          time: '11:05',
-          data: [
-            { id: '1', 'Column 1': 'חדש', 'Column 2': 'string', 'Column 3': '14/07/2024', 'Column 4': 'eventTime' },
-            { id: '2', 'Column 1': 'ID', 'Column 2': 'String', 'Column 3': '432423423', 'Column 4': 'Id' },
-            { id: '3', 'Column 1': 'טלפון', 'Column 2': 'String', 'Column 3': '9728549308', 'Column 4': 'Pstn' }
-          ]
-        },
-        {
-          version: '1.0.2',
-          date: '24/08/2025',
-          time: '10:05',
-          data: [
-            { id: '1', 'Column 1': 'חדש', 'Column 2': 'string', 'Column 3': '14/07/2024', 'Column 4': 'eventTime' },
-            { id: '2', 'Column 1': 'ID', 'Column 2': 'String', 'Column 3': '432423423', 'Column 4': 'Id' }
-          ]
-        },
-        {
-          version: '1.0.1',
-          date: '24/08/2025',
-          time: '10:05',
-          data: [
-            { id: '1', 'Column 1': 'חדש', 'Column 2': 'string', 'Column 3': '14/07/2024', 'Column 4': 'eventTime' }
-          ]
-        }
-      ]
-    },
-    {
-      id: 'sagach2',
-      name: 'סג"ח משני',
-      currentVersion: '1.0.2',
-      data: [
-        { id: '5', 'Column 1': 'כתובת', 'Column 2': 'string', 'Column 3': 'רחוב הנשיא 123', 'Column 4': 'address' },
-        { id: '6', 'Column 1': 'עיר', 'Column 2': 'String', 'Column 3': 'תל אביב', 'Column 4': 'city' }
-      ],
-      versions: [
-        {
-          version: '1.0.2',
-          date: '24/08/2025',
-          time: '10:15',
-          data: [
-            { id: '5', 'Column 1': 'כתובת', 'Column 2': 'string', 'Column 3': 'רחוב הנשיא 123', 'Column 4': 'address' },
-            { id: '6', 'Column 1': 'עיר', 'Column 2': 'String', 'Column 3': 'תל אביב', 'Column 4': 'city' }
-          ]
-        },
-        {
-          version: '1.0.1',
-          date: '24/08/2025',
-          time: '10:10',
-          data: [
-            { id: '5', 'Column 1': 'כתובת', 'Column 2': 'string', 'Column 3': 'רחוב הנשיא 123', 'Column 4': 'address' }
-          ]
-        }
-      ]
-    }
-  ])
+  // Use centralized data context
+  const { sagachs, addSagach, updateSagach, deleteSagach, isLoading, error } = useSagachData()
 
-  const [selectedSagachId, setSelectedSagachId] = useState<string>('sagach1')
-  const [selectedVersion, setSelectedVersion] = useState<string>('1.0.4')
+  const [selectedSagachId, setSelectedSagachId] = useState<string>('')
+  const [selectedVersion, setSelectedVersion] = useState<string>('')
   const [editingCell, setEditingCell] = useState<{rowId: string, field: string} | null>(null)
+  
+  // Set initial selected sagach when data loads
+  useEffect(() => {
+    if (sagachs.length > 0 && !selectedSagachId) {
+      setSelectedSagachId(sagachs[0].id)
+      setSelectedVersion(sagachs[0].currentVersion)
+    }
+  }, [sagachs, selectedSagachId])
   
   // Debug editingCell changes
   useEffect(() => {
@@ -127,6 +57,12 @@ export const SagachimManager = () => {
   const [tableColumns, setTableColumns] = useState<string[]>(['Column 1', 'Column 2', 'Column 3', 'Column 4'])
   const [editingColumn, setEditingColumn] = useState<string | null>(null)
   const [editingColumnName, setEditingColumnName] = useState<string>('')
+  const [filterText, setFilterText] = useState<string>('')
+
+  // Helper function to format dates with '/' separator
+  const formatDate = (date: Date): string => {
+    return date.toLocaleDateString('he-IL').replace(/\./g, '/')
+  }
 
   // Initialize column widths for default columns
   useEffect(() => {
@@ -143,7 +79,7 @@ export const SagachimManager = () => {
 
   // Get current selected sagach
   const getCurrentSagach = (): SagachTable | undefined => {
-    return currentSagachs.find(s => s.id === selectedSagachId)
+    return sagachs.find(s => s.id === selectedSagachId)
   }
 
   // Get versions for current sagach
@@ -163,23 +99,21 @@ export const SagachimManager = () => {
 
   // Get current sagach data
   const getCurrentSagachData = (): SagachItem[] => {
-    const currentSagach = currentSagachs.find(s => s.id === selectedSagachId)
+    const currentSagach = sagachs.find(s => s.id === selectedSagachId)
     return currentSagach ? currentSagach.data : []
   }
 
   // Update current sagach data
   const updateCurrentSagachData = (newData: SagachItem[]) => {
-    setCurrentSagachs(prev => prev.map(sagach => 
-      sagach.id === selectedSagachId 
-        ? { ...sagach, data: newData }
-        : sagach
-    ))
+    if (selectedSagachId) {
+      updateSagach(selectedSagachId, { data: newData })
+    }
   }
 
   const handleSave = (sagachId?: string) => {
     // If sagachId is provided, save only that sagach. Otherwise save the current selected sagach
     const targetSagachId = sagachId || selectedSagachId
-    const currentSagach = currentSagachs.find(s => s.id === targetSagachId)
+    const currentSagach = sagachs.find(s => s.id === targetSagachId)
     
     if (!currentSagach) return
 
@@ -212,22 +146,17 @@ export const SagachimManager = () => {
       const now = new Date()
       const newVersion: SagachVersion = {
         version: newVersionNumber,
-        date: now.toLocaleDateString('he-IL'),
+        date: formatDate(now),
         time: now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
         data: [...currentSagach.data],
         changes
       }
 
       // Update the sagach with the new version
-      setCurrentSagachs(prev => prev.map(sagach => 
-        sagach.id === targetSagachId 
-          ? {
-              ...sagach,
-              currentVersion: newVersionNumber,
-              versions: [newVersion, ...sagach.versions]
-            }
-          : sagach
-      ))
+      updateSagach(targetSagachId, {
+        currentVersion: newVersionNumber,
+        versions: [newVersion, ...currentSagach.versions]
+      })
       
       // Update selected version to the new one if we're viewing this sagach
       if (targetSagachId === selectedSagachId) {
@@ -249,11 +178,7 @@ export const SagachimManager = () => {
     const selectedVersionData = currentSagach.versions.find(v => v.version === version)
     if (selectedVersionData) {
       // Update the current sagach's data to match the selected version
-      setCurrentSagachs(prev => prev.map(sagach => 
-        sagach.id === selectedSagachId 
-          ? { ...sagach, data: [...selectedVersionData.data] }
-          : sagach
-      ))
+      updateSagach(selectedSagachId, { data: [...selectedVersionData.data] })
       setSelectedVersion(version)
       setIsVersionSelected(true) // Mark that a version was explicitly selected
       // Reset changed items when switching versions
@@ -268,13 +193,13 @@ export const SagachimManager = () => {
       const emptyRow = createEmptyRow()
       const initialVersion: SagachVersion = {
         version: '1.0.1',
-        date: now.toLocaleDateString('he-IL'),
+        date: formatDate(now),
         time: now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
         data: [emptyRow],
         changes: ['Initial version']
       }
 
-      const newSagach: SagachTable = {
+      const newSagach: Omit<SagachTable, 'createdBy' | 'createdAt' | 'lastModifiedBy' | 'lastModifiedAt'> = {
         id: newSagachId,
         name: newSagachName.trim(),
         data: [emptyRow],
@@ -282,7 +207,7 @@ export const SagachimManager = () => {
         versions: [initialVersion]
       }
       
-      setCurrentSagachs(prev => [...prev, newSagach])
+      addSagach(newSagach)
       setSelectedSagachId(newSagachId)
       setSelectedVersion('1.0.1')
       setNewSagachName('')
@@ -378,23 +303,29 @@ export const SagachimManager = () => {
 
   const handleCellSave = (rowId: string, field: string, value: string) => {
     // Update the item in whichever sagach contains it
-    setCurrentSagachs(prev => prev.map(sagach => ({
-      ...sagach,
-      data: sagach.data.map(item => 
-        item.id === rowId 
-          ? { ...item, [field]: value }
-          : item
-      )
-    })))
+    sagachs.forEach(sagach => {
+      const itemExists = sagach.data.some(item => item.id === rowId)
+      if (itemExists) {
+        const updatedData = sagach.data.map(item => 
+          item.id === rowId 
+            ? { ...item, [field]: value }
+            : item
+        )
+        updateSagach(sagach.id, { data: updatedData })
+      }
+    })
     setEditingCell(null)
   }
 
   const handleDeleteRow = (id: string) => {
     // Find which sagach contains this item and remove it
-    setCurrentSagachs(prev => prev.map(sagach => ({
-      ...sagach,
-      data: sagach.data.filter(item => item.id !== id)
-    })))
+    sagachs.forEach(sagach => {
+      const itemExists = sagach.data.some(item => item.id === id)
+      if (itemExists) {
+        const updatedData = sagach.data.filter(item => item.id !== id)
+        updateSagach(sagach.id, { data: updatedData })
+      }
+    })
     setShowDeleteConfirm(false)
     setItemToDelete(null)
   }
@@ -508,20 +439,7 @@ export const SagachimManager = () => {
     }))
     
     // Add the new column to all existing data
-    setCurrentSagachs(prev => prev.map(sagach => ({
-      ...sagach,
-      data: sagach.data.map(item => ({
-        ...item,
-        [newColumn]: ''
-      })),
-      versions: sagach.versions.map(version => ({
-        ...version,
-        data: version.data.map(item => ({
-          ...item,
-          [newColumn]: ''
-        }))
-      }))
-    })))
+    addColumnToExistingData(newColumn)
     
     // Auto-select the first cell of the new column for immediate editing
     const currentData = getCurrentSagachData()
@@ -557,18 +475,17 @@ export const SagachimManager = () => {
         return newWidths
       })
       
-      // Update all data in current sagachs to use new column name
-      setCurrentSagachs(prev => prev.map(sagach => ({
-        ...sagach,
-        data: sagach.data.map(item => {
+      // Update all data in sagachs to use new column name
+      sagachs.forEach(sagach => {
+        const updatedData = sagach.data.map(item => {
           const newItem = { ...item }
           if (newItem[oldName] !== undefined) {
             newItem[trimmedNewName] = newItem[oldName]
             delete newItem[oldName]
           }
           return newItem
-        }),
-        versions: sagach.versions.map(version => ({
+        })
+        const updatedVersions = sagach.versions.map(version => ({
           ...version,
           data: version.data.map(item => {
             const newItem = { ...item }
@@ -579,7 +496,8 @@ export const SagachimManager = () => {
             return newItem
           })
         }))
-      })))
+        updateSagach(sagach.id, { data: updatedData, versions: updatedVersions })
+      })
     }
   }
 
@@ -619,20 +537,37 @@ export const SagachimManager = () => {
 
   const addColumnToExistingData = (newColumn: string) => {
     // Add the new column to all existing data
-    setCurrentSagachs(prev => prev.map(sagach => ({
-      ...sagach,
-      data: sagach.data.map(item => ({
+    sagachs.forEach(sagach => {
+      const updatedData = sagach.data.map(item => ({
         ...item,
         [newColumn]: ''
-      })),
-      versions: sagach.versions.map(version => ({
+      }))
+      const updatedVersions = sagach.versions.map(version => ({
         ...version,
         data: version.data.map(item => ({
           ...item,
           [newColumn]: ''
         }))
       }))
-    })))
+      updateSagach(sagach.id, { data: updatedData, versions: updatedVersions })
+    })
+  }
+
+  // Filter sagachs based on text input
+  const getFilteredSagachs = (): SagachTable[] => {
+    if (!filterText.trim()) {
+      return sagachs
+    }
+    
+    const searchTerm = filterText.toLowerCase().trim()
+    return sagachs.filter(sagach => 
+      sagach.name.toLowerCase().includes(searchTerm) ||
+      sagach.data.some(item => 
+        Object.values(item).some(value => 
+          String(value).toLowerCase().includes(searchTerm)
+        )
+      )
+    )
   }
 
   // This function is now handled by individual sagach cards
@@ -728,7 +663,7 @@ export const SagachimManager = () => {
               direction: 'rtl',
               marginBottom: '12px'
             }}>
-              {getCurrentSagach()?.name || 'בחר סג"ח'}
+              {getCurrentSagach()?.name || (sagachs.length === 0 ? 'אין סג"חים' : 'בחר סג"ח')}
             </div>
             
             <div className="versions-list">
@@ -831,7 +766,7 @@ export const SagachimManager = () => {
                   direction: 'rtl',
                   margin: 0
                 }}>
-                  {currentSagachs.find(s => s.id === selectedSagachId)?.name}
+                  {sagachs.find(s => s.id === selectedSagachId)?.name}
                 </h2>
                 {/* Color Legend - Only show when a version is selected and versions panel is expanded */}
                 {isVersionSelected && !isVersionsPanelCollapsed && (
@@ -1209,7 +1144,12 @@ export const SagachimManager = () => {
             fontSize: '16px',
             direction: 'rtl'
           }}>
-            <div>בחר סג"ח כדי להציג את הנתונים</div>
+            <div>
+              {sagachs.length === 0 
+                ? 'אין סג"חים זמינים - צור סג"ח חדש כדי להתחיל' 
+                : 'בחר סג"ח כדי להציג את הנתונים'
+              }
+            </div>
           </div>
         )}
       </div>
@@ -1256,16 +1196,81 @@ export const SagachimManager = () => {
           </button>
         </div>
 
+        {/* Filter Input */}
+        <div style={{ marginBottom: '16px' }}>
+          <input
+            type="text"
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            placeholder="חפש סגחים..."
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '8px',
+              color: 'var(--text)',
+              fontSize: '14px',
+              direction: 'rtl',
+              outline: 'none',
+              fontFamily: 'Segoe UI, sans-serif',
+              transition: 'all 0.2s ease'
+            }}
+            onFocus={(e: React.FocusEvent<HTMLInputElement>) => {
+              e.target.style.borderColor = 'rgba(124,192,255,0.6)'
+              e.target.style.boxShadow = '0 0 8px rgba(124,192,255,0.3)'
+            }}
+            onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+              e.target.style.borderColor = 'rgba(255,255,255,0.2)'
+              e.target.style.boxShadow = 'none'
+            }}
+          />
+        </div>
+
         {/* Sagachs List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-          {currentSagachs.map(sagach => (
-            <SagachCard
-              key={sagach.id}
-              sagach={sagach}
-              isSelected={selectedSagachId === sagach.id}
-              onSelect={() => setSelectedSagachId(sagach.id)}
-            />
-          ))}
+          {getFilteredSagachs().length > 0 ? (
+            getFilteredSagachs().map(sagach => (
+              <SagachCard
+                key={sagach.id}
+                sagach={sagach}
+                isSelected={selectedSagachId === sagach.id}
+                onSelect={() => setSelectedSagachId(sagach.id)}
+              />
+            ))
+          ) : (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '40px 20px',
+              textAlign: 'center',
+              color: 'var(--muted)',
+              direction: 'rtl'
+            }}>
+              <div style={{
+                fontSize: '48px',
+                marginBottom: '16px',
+                opacity: 0.5
+              }}>
+                📋
+              </div>
+              <div style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                marginBottom: '8px'
+              }}>
+                אין סג"חים
+              </div>
+              <div style={{
+                fontSize: '14px',
+                opacity: 0.8
+              }}>
+                צור סג"ח חדש כדי להתחיל
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Bottom buttons */}

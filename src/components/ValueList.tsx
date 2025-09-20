@@ -342,7 +342,7 @@ export function ValueList({ schemas }: ValueListProps) {
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 20px 60px rgba(0,0,0,0.35)'
       }}>
         <div className="value-detail-headline">
-          <div>ת"ז שדה</div>
+          <div></div>
           <div className={`value-detail-path ${selected ? 'selected' : ''}`}>{selected ? (() => {
             const parts = selected.path.split('.')
             if (parts.length <= 2) return selected.name

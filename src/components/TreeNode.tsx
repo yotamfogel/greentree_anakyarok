@@ -29,7 +29,7 @@ export function TreeNode({ node, depth, isRoot = false, defaultOpenChildren = fa
     if (!hasChildren || !node.children) return false
     
     const mandatoryChildren = node.children.filter(child => 
-      child.requiredState === 'required' || child.requiredState === 'conditional'
+      child.requiredState === 'required'
     )
     
     if (mandatoryChildren.length === 0) return false
@@ -94,21 +94,6 @@ export function TreeNode({ node, depth, isRoot = false, defaultOpenChildren = fa
         requiredStyle.cursor = 'url("./cursors/circle.cur"), copy'
       }
       return requiredStyle
-    }
-    if (node.requiredState === 'conditional') {
-      const conditionalStyle: React.CSSProperties = {
-        ...style,
-        borderColor: 'rgba(255,165,0,0.45)',
-        background: 'linear-gradient(180deg, rgba(255,165,0,0.10), rgba(255,165,0,0.05))',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.14), 0 12px 28px rgba(255,165,0,0.20)',
-        ['--indicator-border' as any]: 'rgba(255,165,0,0.45)',
-        ['--indicator-bg' as any]: 'linear-gradient(180deg, rgba(255,165,0,0.18), rgba(255,165,0,0.08))',
-        ['--indicator-shadow' as any]: 'inset 0 1px 0 rgba(255,255,255,0.14), 0 12px 28px rgba(255,165,0,0.20)'
-      } as React.CSSProperties
-      if (isDragOver && hasChildren) {
-        conditionalStyle.cursor = 'url("./cursors/circle.cur"), copy'
-      }
-      return conditionalStyle
     }
     if (isDragOver && hasChildren) {
       style.cursor = 'url("./cursors/circle.cur"), copy'

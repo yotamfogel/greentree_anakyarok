@@ -814,11 +814,6 @@
     border-color: rgba(255,80,80,0.6);
   }
   
-  /* Enhanced orange glow for conditional nodes */
-  .node-tile[data-required="conditional"] { 
-    box-shadow: 0 8px 20px rgba(255,165,0,0.25), 0 0 15px rgba(255,165,0,0.2), 0 0 30px rgba(255,165,0,0.15); 
-    border-color: rgba(255,165,0,0.6);
-  }
   
   /* Prominent green glow for mapped nodes */
   .node-tile[data-mapped="1"] { 
@@ -1147,6 +1142,127 @@
     border-bottom: none;
   }
 
+  /* Permission Manager Modal */
+  .permission-manager-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  }
+
+  .permission-manager-modal {
+    background: linear-gradient(135deg, rgba(20, 30, 48, 0.95), rgba(36, 59, 85, 0.95));
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .permission-manager-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .permission-manager-content {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .add-user-section {
+    margin-bottom: 24px;
+  }
+
+  .add-user-form {
+    animation: slideDown 0.3s ease-out;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .users-list {
+    margin-top: 20px;
+  }
+
+  .users-table {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .user-row {
+    transition: all 0.2s ease;
+  }
+
+  .user-row:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .user-info {
+    direction: rtl;
+  }
+
+  .user-actions {
+    direction: ltr;
+  }
+
+  .close-button {
+    transition: all 0.2s ease;
+  }
+
+  .close-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+  }
+
+  /* Scrollbar styling for permission manager */
+  .permission-manager-content::-webkit-scrollbar,
+  .users-table::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .permission-manager-content::-webkit-scrollbar-track,
+  .users-table::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+  }
+
+  .permission-manager-content::-webkit-scrollbar-thumb,
+  .users-table::-webkit-scrollbar-thumb {
+    background: rgba(124, 192, 255, 0.3);
+    border-radius: 3px;
+  }
+
+  .permission-manager-content::-webkit-scrollbar-thumb:hover,
+  .users-table::-webkit-scrollbar-thumb:hover {
+    background: rgba(124, 192, 255, 0.5);
+  }
+
   .schema-option:hover {
     background: rgba(255,255,255,0.08);
   }
@@ -1461,6 +1577,113 @@
     justify-content: flex-start;
     gap: 8px;
   }
+
+/* Permission System Styles */
+.permission-guard {
+  opacity: 0.6;
+  pointer-events: none;
+  position: relative;
+}
+
+.permission-guard::after {
+  content: 'אין הרשאה';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 0, 0, 0.8);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 10;
+  direction: rtl;
+}
+
+.user-status-dropdown {
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-modal-backdrop {
+  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.permission-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.permission-indicator.granted {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.permission-indicator.denied {
+  background: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+}
+
+/* Hebrew text direction support */
+[dir="rtl"] {
+  text-align: right;
+}
+
+[dir="rtl"] input,
+[dir="rtl"] textarea,
+[dir="rtl"] select {
+  text-align: right;
+}
+
+/* Loading states for permission actions */
+.permission-loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.permission-loading::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: inherit;
+  z-index: 1;
+}
+
+.permission-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border: 2px solid transparent;
+  border-top: 2px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 2;
+}
 
 
 
