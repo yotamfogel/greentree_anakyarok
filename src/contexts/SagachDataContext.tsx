@@ -34,6 +34,7 @@ export interface SagachimStatusItem {
   provider: string
   lastUpdated: string
   arena: string
+  priority: 'נמוך' | 'בינוני' | 'גבוה' | 'TOP'
   processStatus: 1 | 2 | 3 | 4 | 5 | 6 | 7
   processStartDate?: string
   estimatedCompletion?: string
@@ -142,6 +143,7 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
   const migrateStatusData = (data: any[]): SagachimStatusItem[] => {
     return data.map(item => ({
       ...item,
+      priority: item.priority || 'בינוני',
       createdBy: item.createdBy || 'migrated',
       createdAt: item.createdAt || new Date().toISOString(),
       lastModifiedBy: item.lastModifiedBy || 'migrated',

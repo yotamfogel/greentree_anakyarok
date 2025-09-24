@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+﻿import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { usePermissions } from '../contexts/PermissionContext'
 import { useSagachData } from '../contexts/SagachDataContext'
 
@@ -33,6 +33,16 @@ interface StatusUpdate {
   author?: string // Name of the person who wrote the message
 }
 
+const PRIORITY_OPTIONS = ['נמוך', 'בינוני', 'גבוה', 'TOP'] as const
+type PriorityOption = typeof PRIORITY_OPTIONS[number]
+
+const PRIORITY_LABELS: Record<PriorityOption, string> = {
+  'נמוך': 'נמוך',
+  'בינוני': 'בינוני',
+  'גבוה': 'גבוה',
+  'TOP': 'TOP'
+}
+
 interface SagachimStatusItem {
   id: string
   name: string
@@ -40,6 +50,7 @@ interface SagachimStatusItem {
   provider: string
   lastUpdated: string
   arena: string // זירה
+  priority: PriorityOption
   processStatus: 1 | 2 | 3 | 4 | 5 | 6 | 7 // Current step in process chain (1-7)
   processStartDate?: string
   estimatedCompletion?: string
@@ -206,7 +217,7 @@ export const SagachimStatus = () => {
   }
   
   // Default sample data
-  const getDefaultSagachim = (): SagachimStatusItem[] => [
+const getDefaultSagachim = (): SagachimStatusItem[] => [
     {
       id: 'sagach1',
       name: 'סג"ח ראשי',
@@ -214,6 +225,7 @@ export const SagachimStatus = () => {
       provider: 'מחלקת IT',
       lastUpdated: '2024-01-15',
       arena: 'ניהול נתונים',
+      priority: 'גבוה',
       processStatus: 3, // חזר לשלב 3 (בתהליכי אפיון)
       processStartDate: '2024-01-01',
       estimatedCompletion: '2024-02-15',
@@ -256,6 +268,7 @@ export const SagachimStatus = () => {
       provider: 'מחלקת IT',
       lastUpdated: '2024-01-10',
       arena: 'ביטחון ואבטחה',
+      priority: 'בינוני',
       processStatus: 2,
       processStartDate: '2024-01-05',
       estimatedCompletion: '2024-03-01',
@@ -283,6 +296,7 @@ export const SagachimStatus = () => {
       provider: 'מחלקת כספים',
       lastUpdated: '2024-01-08',
       arena: 'פיתוח עסקי',
+      priority: 'נמוך',
       processStatus: 1,
       processStartDate: '2024-01-08',
       estimatedCompletion: '2024-04-01',
@@ -305,6 +319,7 @@ export const SagachimStatus = () => {
       provider: 'שב"כ',
       lastUpdated: '2024-01-12',
       arena: '190',
+      priority: 'גבוה',
       processStatus: 6,
       processStartDate: '2023-11-01',
       estimatedCompletion: '2024-01-15',
@@ -348,6 +363,7 @@ export const SagachimStatus = () => {
       provider: 'מחלקת לוגיסטיקה',
       lastUpdated: '2023-12-20',
       arena: 'ניהול משאבים',
+      priority: 'TOP',
       processStatus: 6,
       processStartDate: '2023-10-01',
       estimatedCompletion: '2023-12-31',
@@ -391,6 +407,7 @@ export const SagachimStatus = () => {
       provider: 'מחלקת משאבי אנוש',
       lastUpdated: '2024-01-14',
       arena: 'כספים ותקציב',
+      priority: 'גבוה',
       processStatus: 3,
       processStartDate: '2023-12-15',
       estimatedCompletion: '2024-02-28',
@@ -435,6 +452,7 @@ export const SagachimStatus = () => {
   const [isProcessStatusDropdownOpen, setIsProcessStatusDropdownOpen] = useState<boolean>(false)
   const [isStatusEditDropdownOpen, setIsStatusEditDropdownOpen] = useState<boolean>(false)
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState<boolean>(false)
+  const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState<boolean>(false)
   
   // Notification settings popup
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState<boolean>(false)
@@ -452,7 +470,8 @@ export const SagachimStatus = () => {
     name: '',
     description: '',
     provider: '',
-    arena: ''
+    arena: '',
+    priority: 'בינוני' as PriorityOption
   })
 
   // Bottom popup indicators
@@ -626,6 +645,7 @@ export const SagachimStatus = () => {
       setIsProcessStatusDropdownOpen(false)
       setIsStatusEditDropdownOpen(false)
       setIsSortDropdownOpen(false)
+    setIsPriorityDropdownOpen(false)
     }
 
     document.addEventListener('click', handleClickOutside)
@@ -1046,7 +1066,7 @@ export const SagachimStatus = () => {
 
     // Validation
     if (!newSagachForm.name.trim() || !newSagachForm.description.trim() || 
-        !newSagachForm.provider.trim() || !newSagachForm.arena.trim()) {
+        !newSagachForm.provider.trim() || !newSagachForm.arena.trim() || !newSagachForm.priority) {
       alert('יש למלא את כל השדות הדרושים')
       return
     }
@@ -1068,6 +1088,7 @@ export const SagachimStatus = () => {
         provider: newSagachForm.provider.trim(),
         lastUpdated: formatDateWithSlashes(getCurrentDate()),
         arena: newSagachForm.arena.trim(),
+        priority: newSagachForm.priority,
         processStatus: 1,
         processStartDate: getCurrentDate().toISOString().split('T')[0],
         estimatedCompletion: '-', // Default value
@@ -1096,7 +1117,7 @@ export const SagachimStatus = () => {
       addSagachimStatus(newSagach);
       
       // Reset form and close popup
-      setNewSagachForm({ name: '', description: '', provider: '', arena: '' })
+      setNewSagachForm({ name: '', description: '', provider: '', arena: '', priority: 'בינוני' as PriorityOption })
       setIsNewSagachPopupOpen(false)
       
       // Open the new sagach for editing
@@ -2451,6 +2472,27 @@ export const SagachimStatus = () => {
                               }
                             </div>
 
+                            {sagach.priority === 'TOP' && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '16px',
+                                right: '16px',
+                                background: 'linear-gradient(135deg, rgba(150, 16, 16, 0.9), rgba(174, 20, 20, 0.7))',
+                                color: '#1f1f1f',
+                                padding: '6px 12px',
+                                borderRadius: '999px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                letterSpacing: '0.5px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 6px 18px rgba(155, 22, 22, 0.35)'
+                              }}>
+                                 TOP
+                              </div>
+                            )}
+
                             {/* Content */}
                             <div style={{ marginTop: '40px', direction: 'rtl' }}>
                               <h3 style={{
@@ -2630,6 +2672,27 @@ export const SagachimStatus = () => {
                       }
                     </div>
 
+                    {sagach.priority === 'TOP' && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '16px',
+                        right: '16px',
+                        background: 'linear-gradient(135deg, rgba(146, 23, 23, 0.9), rgba(236, 35, 35, 0.7))',
+                        color: '#FFFFFF',
+                        padding: '6px 12px',
+                        borderRadius: '999px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        letterSpacing: '0.5px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 6px 18px rgba(255, 0, 0, 0.35)'
+                      }}>
+                        TOP
+                      </div>
+                    )}
+
                     {/* Content */}
                     <div style={{ marginTop: '40px', direction: 'rtl' }}>
                       <h3 style={{
@@ -2695,6 +2758,27 @@ export const SagachimStatus = () => {
                             color: 'var(--text)'
                           }}>
                             {sagach.arena}
+                          </span>
+                        </div>
+
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <span style={{
+                            fontSize: '12px',
+                            color: 'var(--muted)',
+                            fontWeight: '600'
+                          }}>
+                            תעדוף:
+                          </span>
+                          <span style={{
+                            fontSize: '12px',
+                            
+                            fontWeight: sagach.priority === 'TOP' ? 700 : 400
+                          }}>
+                            {PRIORITY_LABELS[sagach.priority]}
                           </span>
                         </div>
 
@@ -3058,6 +3142,109 @@ export const SagachimStatus = () => {
                   }}>
                     {selectedSagach.arena}
                   </p>
+                </div>
+
+                {/* 3b. תעדוף */}
+                <div>
+                  <h4 style={{ 
+                    color: 'rgba(124,192,255,0.9)', 
+                    fontSize: '18px', 
+                    fontWeight: '600', 
+                    margin: '0 0 8px 0' 
+                  }}>
+                    תעדוף
+                  </h4>
+                  {canEditStatus() ? (
+                    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => setIsPriorityDropdownOpen(prev => !prev)}
+                        style={{
+                          appearance: 'none',
+                          border: '1px solid rgba(255,255,255,0.14)',
+                          background: 'rgba(255,255,255,0.06)',
+                          borderRadius: '12px',
+                          color: '#ffffff',
+                          padding: '10px 16px',
+                          cursor: 'pointer',
+                          fontSize: '16px',
+                          direction: 'rtl',
+                          outline: 'none',
+                          fontFamily: 'Segoe UI, sans-serif',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          width: '100%'
+                        }}
+                      >
+                        <span>{PRIORITY_LABELS[selectedSagach.priority]}</span>
+                        <span style={{ marginLeft: '8px', fontSize: '12px' }}>▼</span>
+                      </button>
+
+                      {isPriorityDropdownOpen && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 4px)',
+                          right: 0,
+                          left: 0,
+                          background: 'var(--panel)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '12px',
+                          zIndex: 1000,
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                          backdropFilter: 'blur(8px)',
+                          overflow: 'hidden'
+                        }}>
+                          {PRIORITY_OPTIONS.map(option => (
+                            <div
+                              key={`detail-priority-${option}`}
+                              onClick={() => {
+                                setIsPriorityDropdownOpen(false)
+                                if (!selectedSagach || option === selectedSagach.priority) return
+                                const updatedSagach = { ...selectedSagach, priority: option }
+                                updateSagachimStatus(selectedSagach.id, { priority: option })
+                                setSelectedSagach(updatedSagach)
+                                showPopupIndicator('התעדוף עודכן בהצלחה', 'success')
+                              }}
+                              style={{
+                                padding: '10px 16px',
+                                cursor: 'pointer',
+                                transition: 'background 0.2s ease',
+                                direction: 'rtl',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: selectedSagach.priority === option ? 'rgba(124,192,255,0.15)' : 'transparent',
+                                fontWeight: option === 'TOP' ? 700 : 500
+                              }}
+                              onMouseEnter={(e) => {
+                                (e.currentTarget as HTMLDivElement).style.background = 'rgba(124,192,255,0.15)'
+                              }}
+                              onMouseLeave={(e) => {
+                                if (selectedSagach.priority !== option) {
+                                  (e.currentTarget as HTMLDivElement).style.background = 'transparent'
+                                }
+                              }}
+                            >
+                              <span>{option === 'TOP' ? 'TOP' : option}</span>
+                              {option === selectedSagach.priority && <span>✓</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p style={{ 
+                      color: selectedSagach.priority === 'TOP' ? '#ffd700' : 'var(--text)', 
+                      fontSize: '18px', 
+                      margin: 0,
+                      lineHeight: '1.8',
+                      fontWeight: selectedSagach.priority === 'TOP' ? '700' : '500'
+                    }}>
+                      {PRIORITY_LABELS[selectedSagach.priority]}
+                    </p>
+                  )}
                 </div>
 
                 {/* 4. סטטוס נוכחי (העתקת ההודעה האחרונה מהצ'אט) */}
@@ -3592,7 +3779,7 @@ export const SagachimStatus = () => {
                         minWidth: '130px',
                         maxWidth: '150px',
                         padding: '8px 8px',
-                        position: 'relative'
+                      position: 'relative'
                       }}>
                         {/* Step Circle */}
                         <div style={{
@@ -4467,15 +4654,15 @@ export const SagachimStatus = () => {
               />
             </div>
 
-            {/* Provider and Arena Row */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '16px'
-            }}>
+            {/* Provider, Arena & Priority Row */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '16px'
+              }}>
               
               {/* Provider */}
-              <div>
+              <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
                 <label style={{
                   display: 'block',
                   color: 'var(--text)',
@@ -4569,6 +4756,112 @@ export const SagachimStatus = () => {
                   }}
                 />
               </div>
+
+              {/* Priority */}
+              <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                <label style={{
+                  display: 'block',
+                  color: 'var(--text)',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  marginBottom: '8px'
+                }}>
+                  תעדוף *
+                </label>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!isCreateSagachLoading) {
+                      setIsPriorityDropdownOpen(prev => !prev)
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '12px',
+                    color: 'var(--text)',
+                    fontSize: '14px',
+                    fontFamily: 'Segoe UI, sans-serif',
+                    outline: 'none',
+                    transition: 'all 0.2s ease',
+                    direction: 'rtl',
+                    opacity: isCreateSagachLoading ? 0.6 : 1,
+                    cursor: isCreateSagachLoading ? 'not-allowed' : 'pointer',
+                    boxSizing: 'border-box',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                  disabled={isCreateSagachLoading}
+                  onMouseEnter={(e) => {
+                    if (!isCreateSagachLoading) {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(124,192,255,0.6)'
+                      ;(e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isCreateSagachLoading) {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.2)'
+                      ;(e.currentTarget as HTMLButtonElement).style.boxShadow = 'none'
+                    }
+                  }}
+                >
+                  <span>{newSagachForm.priority}</span>
+                  <span style={{ fontSize: '12px', marginLeft: '8px' }}>▼</span>
+                </button>
+                {isPriorityDropdownOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 4px)',
+                    right: 0,
+                    left: 0,
+                    background: 'var(--panel)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '12px',
+                    zIndex: 1000,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                    backdropFilter: 'blur(8px)',
+                    overflow: 'hidden'
+                  }}>
+                    {PRIORITY_OPTIONS.map(option => (
+                      <div
+                        key={option}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setNewSagachForm(prev => ({ ...prev, priority: option }))
+                          setIsPriorityDropdownOpen(false)
+                        }}
+                        style={{
+                          padding: '10px 16px',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s ease',
+                          direction: 'rtl',
+                          color: 'var(--text)',
+                          fontSize: '14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: newSagachForm.priority === option ? 'rgba(124,192,255,0.15)' : 'transparent'
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLDivElement).style.background = 'rgba(124,192,255,0.15)'
+                        }}
+                        onMouseLeave={(e) => {
+                          if (newSagachForm.priority !== option) {
+                            (e.currentTarget as HTMLDivElement).style.background = 'transparent'
+                          }
+                        }}
+                      >
+                        <span>{option}</span>
+                        {option === 'TOP' && <span style={{ fontSize: '12px', color: 'var(--accent)' }}>🔥</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -4611,7 +4904,7 @@ export const SagachimStatus = () => {
               onClick={() => {
                 if (!isCreateSagachLoading) {
                   setIsNewSagachPopupOpen(false)
-                  setNewSagachForm({ name: '', description: '', provider: '', arena: '' })
+                  setNewSagachForm({ name: '', description: '', provider: '', arena: '', priority: 'בינוני' as PriorityOption })
                 }
               }}
               disabled={isCreateSagachLoading}
