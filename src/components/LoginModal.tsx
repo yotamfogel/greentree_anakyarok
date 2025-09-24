@@ -42,7 +42,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         return
       }
 
-      await login(formData)
+      await login(formData) 
       onClose()
       // Reset form
       setFormData({ name: '', email: '', password: '', role: 'viewer' })

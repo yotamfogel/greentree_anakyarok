@@ -65,11 +65,6 @@ interface StatusUpdate {
   author?: string
 }
 
-interface PhaseData {
-  startDate?: string
-  completionDate?: string
-  timeSpentDays?: number
-}
 
 interface NotificationSubscriber {
   userId: string

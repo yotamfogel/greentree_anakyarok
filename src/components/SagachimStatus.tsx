@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { usePermissions } from '../contexts/PermissionContext'
 import { useSagachData } from '../contexts/SagachDataContext'
 
@@ -10,10 +10,16 @@ const formatDateWithSlashes = (date: Date): string => {
   return `${day}/${month}/${year}`
 }
 
-interface PhaseData {
-  startDate?: string
+interface PhaseEntry {
+  startDate: string
   completionDate?: string
-  timeSpentDays?: number
+  timeSpentDays: number
+}
+
+interface PhaseData {
+  entries?: PhaseEntry[] // History of all entries to this phase
+  currentEntry?: PhaseEntry // Current active entry (for ongoing phases)
+  totalTimeSpentDays?: number // Total time spent in this phase across all entries
 }
 
 interface StatusUpdate {
@@ -139,9 +145,6 @@ export const SagachimStatus = () => {
     }
   }
   
-  const getNotificationSubscribersCount = (sagach: SagachimStatusItem): number => {
-    return sagach.notificationSubscribers?.length || 0
-  }
   
   // Standardized button styles
   const buttonStyles = {
@@ -211,20 +214,38 @@ export const SagachimStatus = () => {
       provider: 'מחלקת IT',
       lastUpdated: '2024-01-15',
       arena: 'ניהול נתונים',
-      processStatus: 5,
+      processStatus: 3, // חזר לשלב 3 (בתהליכי אפיון)
       processStartDate: '2024-01-01',
       estimatedCompletion: '2024-02-15',
       contactPerson: 'יוסי כהן',
-      notes: 'התקדמות טובה, צפוי להסתיים בזמן',
+      notes: 'חזר לשלב אפיון - צפוי להסתיים בזמן',
       notifications: false,
       statusUpdates: [],
       notificationSubscribers: [],
       phaseData: {
-        1: { startDate: '2024-01-01', completionDate: '2024-01-07', timeSpentDays: 6 },
-        2: { startDate: '2024-01-08', completionDate: '2024-01-15', timeSpentDays: 7 },
-        3: { startDate: '2024-01-16', completionDate: '2024-01-25', timeSpentDays: 9 },
-        4: { startDate: '2024-01-26', completionDate: '2024-01-30', timeSpentDays: 4 },
-        5: { startDate: '2024-01-31', timeSpentDays: 15 }, // Current phase
+        1: {
+          entries: [{ startDate: '2024-01-01', completionDate: '2024-01-07', timeSpentDays: 6 }],
+          totalTimeSpentDays: 6
+        },
+        2: {
+          entries: [{ startDate: '2024-01-08', completionDate: '2024-01-15', timeSpentDays: 7 }],
+          totalTimeSpentDays: 7
+        },
+        3: {
+          entries: [
+            { startDate: '2024-01-16', completionDate: '2024-01-25', timeSpentDays: 9 }, // שהייה ראשונה
+            { startDate: '2024-01-31', timeSpentDays: 0 } // שהייה שנייה - נוכחית
+          ],
+          currentEntry: { startDate: '2024-01-31', timeSpentDays: 0 },
+          totalTimeSpentDays: 9 // סה"כ מהשהייה הראשונה
+        },
+        4: {
+          entries: [{ startDate: '2024-01-26', completionDate: '2024-01-30', timeSpentDays: 4 }],
+          totalTimeSpentDays: 4
+        },
+        5: {
+          totalTimeSpentDays: 0
+        },
         6: {}, 7: {} // Not started yet
       }
     },
@@ -244,8 +265,14 @@ export const SagachimStatus = () => {
       statusUpdates: [],
       notificationSubscribers: [],
       phaseData: {
-        1: { startDate: '2024-01-05', completionDate: '2024-01-12', timeSpentDays: 7 },
-        2: { startDate: '2024-01-13', timeSpentDays: 12 }, // Current phase
+        1: {
+          entries: [{ startDate: '2024-01-05', completionDate: '2024-01-12', timeSpentDays: 7 }],
+          totalTimeSpentDays: 7
+        },
+        2: {
+          currentEntry: { startDate: '2024-01-13', timeSpentDays: 0 },
+          totalTimeSpentDays: 0
+        },
         3: {}, 4: {}, 5: {}, 6: {}, 7: {}
       }
     },
@@ -264,7 +291,10 @@ export const SagachimStatus = () => {
       notifications: true,
       statusUpdates: [],
       phaseData: {
-        1: { startDate: '2024-01-08', timeSpentDays: 10 },
+        1: {
+          currentEntry: { startDate: '2024-01-08', timeSpentDays: 0 },
+          totalTimeSpentDays: 0
+        },
         2: {}, 3: {}, 4: {}, 5: {}, 6: {}, 7: {}
       }
     },
@@ -284,12 +314,30 @@ export const SagachimStatus = () => {
       statusUpdates: [],
       notificationSubscribers: [],
       phaseData: {
-        1: { startDate: '2023-11-01', completionDate: '2023-11-10', timeSpentDays: 9 },
-        2: { startDate: '2023-11-11', completionDate: '2023-11-20', timeSpentDays: 9 },
-        3: { startDate: '2023-11-21', completionDate: '2023-12-05', timeSpentDays: 14 },
-        4: { startDate: '2023-12-06', completionDate: '2023-12-15', timeSpentDays: 9 },
-        5: { startDate: '2023-12-16', completionDate: '2023-12-20', timeSpentDays: 4 },
-        6: { startDate: '2023-12-21', completionDate: '2024-01-15', timeSpentDays: 25 },
+        1: {
+          entries: [{ startDate: '2023-11-01', completionDate: '2023-11-10', timeSpentDays: 9 }],
+          totalTimeSpentDays: 9
+        },
+        2: {
+          entries: [{ startDate: '2023-11-11', completionDate: '2023-11-20', timeSpentDays: 9 }],
+          totalTimeSpentDays: 9
+        },
+        3: {
+          entries: [{ startDate: '2023-11-21', completionDate: '2023-12-05', timeSpentDays: 14 }],
+          totalTimeSpentDays: 14
+        },
+        4: {
+          entries: [{ startDate: '2023-12-06', completionDate: '2023-12-15', timeSpentDays: 9 }],
+          totalTimeSpentDays: 9
+        },
+        5: {
+          entries: [{ startDate: '2023-12-16', completionDate: '2023-12-20', timeSpentDays: 4 }],
+          totalTimeSpentDays: 4
+        },
+        6: {
+          entries: [{ startDate: '2023-12-21', completionDate: '2024-01-15', timeSpentDays: 25 }],
+          totalTimeSpentDays: 25
+        },
         7: {}
       }
     },
@@ -309,12 +357,30 @@ export const SagachimStatus = () => {
       statusUpdates: [],
       notificationSubscribers: [],
       phaseData: {
-        1: { startDate: '2023-10-01', completionDate: '2023-10-08', timeSpentDays: 7 },
-        2: { startDate: '2023-10-09', completionDate: '2023-10-18', timeSpentDays: 9 },
-        3: { startDate: '2023-10-19', completionDate: '2023-11-15', timeSpentDays: 27 },
-        4: { startDate: '2023-11-16', completionDate: '2023-11-25', timeSpentDays: 9 },
-        5: { startDate: '2023-11-26', completionDate: '2023-12-05', timeSpentDays: 9 },
-        6: { startDate: '2023-12-06', completionDate: '2023-12-20', timeSpentDays: 14 },
+        1: {
+          entries: [{ startDate: '2023-10-01', completionDate: '2023-10-08', timeSpentDays: 7 }],
+          totalTimeSpentDays: 7
+        },
+        2: {
+          entries: [{ startDate: '2023-10-09', completionDate: '2023-10-18', timeSpentDays: 9 }],
+          totalTimeSpentDays: 9
+        },
+        3: {
+          entries: [{ startDate: '2023-10-19', completionDate: '2023-11-15', timeSpentDays: 27 }],
+          totalTimeSpentDays: 27
+        },
+        4: {
+          entries: [{ startDate: '2023-11-16', completionDate: '2023-11-25', timeSpentDays: 9 }],
+          totalTimeSpentDays: 9
+        },
+        5: {
+          entries: [{ startDate: '2023-11-26', completionDate: '2023-12-05', timeSpentDays: 9 }],
+          totalTimeSpentDays: 9
+        },
+        6: {
+          entries: [{ startDate: '2023-12-06', completionDate: '2023-12-20', timeSpentDays: 14 }],
+          totalTimeSpentDays: 14
+        },
         7: {}
       }
     },
@@ -333,9 +399,18 @@ export const SagachimStatus = () => {
       notifications: true,
       statusUpdates: [],
       phaseData: {
-        1: { startDate: '2023-12-15', completionDate: '2023-12-22', timeSpentDays: 7 },
-        2: { startDate: '2023-12-23', completionDate: '2024-01-05', timeSpentDays: 13 },
-        3: { startDate: '2024-01-06', timeSpentDays: 12 },
+        1: {
+          entries: [{ startDate: '2023-12-15', completionDate: '2023-12-22', timeSpentDays: 7 }],
+          totalTimeSpentDays: 7
+        },
+        2: {
+          entries: [{ startDate: '2023-12-23', completionDate: '2024-01-05', timeSpentDays: 13 }],
+          totalTimeSpentDays: 13
+        },
+        3: {
+          currentEntry: { startDate: '2024-01-06', timeSpentDays: 0 },
+          totalTimeSpentDays: 0
+        },
         4: {}, 5: {}, 6: {}, 7: {}
       }
     }
@@ -394,31 +469,154 @@ export const SagachimStatus = () => {
   // Debug: Mock date for testing time-based features
   const [mockDate, setMockDate] = useState<Date | null>(null)
   const [isDebugPanelOpen, setIsDebugPanelOpen] = useState<boolean>(false)
-  
+
   // Date editing states
   const [isEditingDate, setIsEditingDate] = useState<boolean>(false)
   const [editDateValue, setEditDateValue] = useState<string>('')
-  
+
+  // Force re-render when date changes
+  const [currentDate, setCurrentDate] = useState<Date>(new Date())
+
   // Get current date (mock or real)
-  const getCurrentDate = () => mockDate || new Date()
+  const getCurrentDate = () => mockDate || currentDate
+
+  // Update current date when mock date changes
+  useEffect(() => {
+    if (mockDate) {
+      setCurrentDate(mockDate)
+    } else {
+      setCurrentDate(new Date())
+    }
+  }, [mockDate])
+
+  // Update current date every minute to trigger re-renders for time calculations
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!mockDate) {
+        setCurrentDate(new Date())
+      }
+    }, 60000) // Update every minute
+
+    return () => clearInterval(interval)
+  }, [mockDate])
+
+  // State to force re-render when times change
+  const [, forceUpdate] = useState(0)
+
+  // Force re-render when any data that affects time calculations changes
+  useEffect(() => {
+    forceUpdate(prev => prev + 1)
+  }, [selectedSagach?.id, selectedSagach?.processStatus, selectedSagach?.lastUpdated, mockDate, currentDate, sagachimStatus.length])
+
+  // Additional state for immediate time updates
+  const [, immediateUpdate] = useState(0)
+  useEffect(() => {
+    if (selectedSagach) {
+      immediateUpdate(prev => prev + 1)
+    }
+  }, [mockDate, currentDate])
+
+  // Update all sagach time calculations on mount and when date changes
+  useEffect(() => {
+    const updateAllSagachTimes = () => {
+      if (sagachimStatus.length > 0) {
+        const updatedSagachs = sagachimStatus.map(sagach => {
+          const currentDate = getCurrentDate()
+          const currentPhaseData = { ...(sagach.phaseData || {}) }
+
+          // Update time calculations for all phases
+          Object.keys(currentPhaseData).forEach(phaseKey => {
+            const phaseNumber = parseInt(phaseKey)
+            const phaseData = currentPhaseData[phaseNumber]
+
+            if (phaseData) {
+              let completedDays = 0
+              if (phaseData.entries) {
+                phaseData.entries.forEach((entry: PhaseEntry) => {
+                  if (entry.timeSpentDays) {
+                    completedDays += entry.timeSpentDays
+                  }
+                })
+              }
+
+              let currentEntryDays = phaseData.currentEntry?.timeSpentDays || 0
+
+              if (phaseData.currentEntry && phaseNumber === sagach.processStatus) {
+                const startDate = new Date(phaseData.currentEntry.startDate + 'T00:00:00')
+                const endDate = new Date(currentDate.toISOString().split('T')[0] + 'T23:59:59')
+                const diffTime = Math.max(0, endDate.getTime() - startDate.getTime())
+                currentEntryDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
+              }
+
+              const totalDays = completedDays + currentEntryDays
+
+              currentPhaseData[phaseNumber] = {
+                ...phaseData,
+                currentEntry: phaseData.currentEntry
+                  ? { ...phaseData.currentEntry, timeSpentDays: currentEntryDays }
+                  : undefined,
+                totalTimeSpentDays: Math.max(phaseData.totalTimeSpentDays || 0, totalDays)
+              }
+            }
+          })
+
+          return {
+            ...sagach,
+            phaseData: currentPhaseData,
+            lastUpdated: formatDateWithSlashes(currentDate)
+          }
+        })
+
+        // Update all sagachs in one operation
+        updatedSagachs.forEach(sagach => {
+          updateSagachimStatus(sagach.id, sagach)
+        })
+      }
+    }
+
+    // Update times on mount and when date changes
+    updateAllSagachTimes()
+
+    // Force re-render after updating times
+    forceUpdate(prev => prev + 1)
+    immediateUpdate(prev => prev + 1)
+  }, [mockDate, currentDate, sagachimStatus.length, forceUpdate, immediateUpdate])
 
   // Calculate days spent in a specific phase
-  const calculatePhaseDays = (phaseData: PhaseData, isCurrentPhase: boolean = false): number => {
-    if (phaseData.timeSpentDays !== undefined && phaseData.completionDate) {
-      // Completed phase - use stored value
-      return phaseData.timeSpentDays
+  const calculatePhaseDays = useCallback((phaseData: PhaseData, isCurrentPhase: boolean = false): number => {
+    if (!phaseData) return 0
+
+    const completedEntriesTotal = (phaseData.entries || []).reduce((sum, entry) => {
+      if (typeof entry.timeSpentDays === 'number' && !Number.isNaN(entry.timeSpentDays)) {
+        return sum + entry.timeSpentDays
+      }
+      return sum
+    }, 0)
+
+    const recordedTotal = typeof phaseData.totalTimeSpentDays === 'number' && !Number.isNaN(phaseData.totalTimeSpentDays)
+      ? phaseData.totalTimeSpentDays
+      : 0
+
+    // Base total excludes the currently active entry so we can recalculate it live when needed
+    const currentEntryRecorded = typeof phaseData.currentEntry?.timeSpentDays === 'number' && !Number.isNaN(phaseData.currentEntry?.timeSpentDays)
+      ? phaseData.currentEntry!.timeSpentDays
+      : 0
+
+    const baseTotal = Math.max(completedEntriesTotal, recordedTotal)
+    const baseWithoutCurrent = Math.max(completedEntriesTotal, Math.max(0, recordedTotal - currentEntryRecorded))
+
+    if (isCurrentPhase && phaseData.currentEntry?.startDate) {
+      const startDate = new Date(phaseData.currentEntry.startDate + 'T00:00:00')
+      const currentDateValue = getCurrentDate()
+      const currentDate = new Date(currentDateValue.toISOString().split('T')[0] + 'T23:59:59')
+      const diffTime = Math.max(0, currentDate.getTime() - startDate.getTime())
+      const ongoingDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
+
+      return baseWithoutCurrent + ongoingDays
     }
-    
-    if (phaseData.startDate && isCurrentPhase) {
-      // Current phase - calculate dynamically
-      const startDate = new Date(phaseData.startDate)
-      const currentDate = getCurrentDate()
-      const diffTime = Math.abs(currentDate.getTime() - startDate.getTime())
-      return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24))) // Minimum 1 day
-    }
-    
-    return 0
-  }
+
+    return baseTotal
+  }, [mockDate, currentDate]) // This callback will be recreated when mockDate or currentDate changes
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -655,7 +853,7 @@ export const SagachimStatus = () => {
 
       // Calculate days spent in previous phase for the message
       let daysInPreviousPhase = 0
-      if (selectedSagach.phaseData?.[selectedSagach.processStatus]?.startDate) {
+      if (selectedSagach.phaseData?.[selectedSagach.processStatus]?.currentEntry?.startDate) {
         const phaseData = selectedSagach.phaseData[selectedSagach.processStatus]
         daysInPreviousPhase = calculatePhaseDays(phaseData, true)
       }
@@ -674,27 +872,72 @@ export const SagachimStatus = () => {
       // Update phase data when changing status
       const currentDate = getCurrentDate()
       const currentPhaseData = { ...(selectedSagach.phaseData || {}) }
-      
+
       // Complete the current phase
-      if (selectedSagach.phaseData?.[selectedSagach.processStatus]?.startDate) {
+      if (selectedSagach.phaseData?.[selectedSagach.processStatus]?.currentEntry?.startDate) {
         const currentPhase = currentPhaseData[selectedSagach.processStatus] || {}
-        const startDate = new Date(currentPhase.startDate!)
-        const diffTime = Math.abs(currentDate.getTime() - startDate.getTime())
+
+        // Calculate time spent in current entry
+        const startDate = new Date(currentPhase.currentEntry!.startDate + 'T00:00:00')
+        const endDate = new Date(currentDate.toISOString().split('T')[0] + 'T23:59:59')
+        const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
         const timeSpentDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-        
-        currentPhaseData[selectedSagach.processStatus] = {
-          ...currentPhase,
-          completionDate: currentDate.toISOString(),
+
+        // Create completed entry
+        const completedEntry: PhaseEntry = {
+          startDate: currentPhase.currentEntry!.startDate,
+          completionDate: currentDate.toISOString().split('T')[0],
           timeSpentDays: timeSpentDays
         }
+
+        // Update phase data with new entry
+        currentPhaseData[selectedSagach.processStatus] = {
+          entries: [...(currentPhase.entries || []), completedEntry],
+          currentEntry: undefined,
+          totalTimeSpentDays: timeSpentDays
+        }
       }
-      
+
       // Start the new phase (unless it's completion status 7)
       if (newStatusValue < 7) {
-        currentPhaseData[newStatusValue] = {
-          ...currentPhaseData[newStatusValue],
-          startDate: currentDate.toISOString(),
-          timeSpentDays: 0
+        const newPhaseData = currentPhaseData[newStatusValue] || {}
+
+        // Check if this phase already has a currentEntry (when returning to a previous phase)
+        const hasCurrentEntry = newPhaseData.currentEntry
+
+        // If returning to a phase that already has currentEntry, create a new entry
+        if (hasCurrentEntry) {
+          // Complete the existing current entry
+          const completedEntry: PhaseEntry = {
+            startDate: newPhaseData.currentEntry!.startDate,
+            completionDate: currentDate.toISOString().split('T')[0],
+            timeSpentDays: Math.ceil(Math.abs(new Date(currentDate.toISOString().split('T')[0] + 'T23:59:59').getTime() - new Date(newPhaseData.currentEntry!.startDate + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24))
+          }
+
+          currentPhaseData[newStatusValue] = {
+            ...newPhaseData,
+            entries: [...(newPhaseData.entries || []), completedEntry],
+            currentEntry: {
+              startDate: currentDate.toISOString().split('T')[0],
+              timeSpentDays: 0
+            },
+            totalTimeSpentDays: Math.max(
+              calculatePhaseDays(newPhaseData, false) + completedEntry.timeSpentDays,
+              (newPhaseData.totalTimeSpentDays || 0)
+            )
+          }
+        } else {
+          // First time entering this phase
+          const newEntry: PhaseEntry = {
+            startDate: currentDate.toISOString().split('T')[0],
+            timeSpentDays: 0
+          }
+
+          currentPhaseData[newStatusValue] = {
+            ...newPhaseData,
+            currentEntry: newEntry,
+            totalTimeSpentDays: Math.max(calculatePhaseDays(newPhaseData, false), newPhaseData.totalTimeSpentDays || 0)
+          }
         }
       }
 
@@ -840,7 +1083,10 @@ export const SagachimStatus = () => {
           author: user?.name || 'משתמש'
         }],
         phaseData: {
-          1: { startDate: getCurrentDate().toISOString().split('T')[0], timeSpentDays: 0 },
+          1: {
+            currentEntry: { startDate: getCurrentDate().toISOString().split('T')[0], timeSpentDays: 0 },
+            totalTimeSpentDays: 0
+          },
           2: {}, 3: {}, 4: {}, 5: {}, 6: {}, 7: {}
         }
       };
@@ -910,26 +1156,9 @@ export const SagachimStatus = () => {
       )
     }
 
-     // Add system update about notification change
-     const notificationUpdate: StatusUpdate = {
-       id: Date.now().toString(),
-       message: !isCurrentlySubscribed 
-         ? `הפעלת התראות על עדכוני סטטוס (${getNotificationSubscribersCount(updatedSagach)} משתמשים)`
-         : `ביטלת התראות על עדכוני סטטוס (${getNotificationSubscribersCount(updatedSagach)} משתמשים)`,
-       timestamp: formatDate(getCurrentDate().toISOString()),
-       type: 'system',
-       processStatus: selectedSagach.processStatus,
-       author: 'מערכת'
-     }
-
-    const updatedSagachWithNotification = {
-      ...updatedSagach,
-      statusUpdates: [...(updatedSagach.statusUpdates || []), notificationUpdate]
-    }
+    updateSagachimStatus(selectedSagach.id, updatedSagach)
     
-    updateSagachimStatus(selectedSagach.id, updatedSagachWithNotification)
-    
-    setSelectedSagach(updatedSagachWithNotification)
+    setSelectedSagach(updatedSagach)
     showPopupIndicator(
       !isCurrentlySubscribed 
         ? 'התראות הופעלו בהצלחה' 
@@ -941,34 +1170,64 @@ export const SagachimStatus = () => {
   return (
     <>
       {/* Debug Panel */}
-      <div style={{
-        position: 'fixed',
-        top: '20px',
-        right: '20px',
-        zIndex: 1000,
-        background: 'rgba(0,0,0,0.8)',
-        borderRadius: '12px',
-        padding: isDebugPanelOpen ? '16px' : '8px',
-        border: '1px solid rgba(255,255,255,0.2)',
-        backdropFilter: 'blur(8px)',
-        transition: 'all 0.3s ease'
-      }}>
+      <div
+        style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          zIndex: 1000,
+          background: 'rgba(0,0,0,0.8)',
+          borderRadius: '12px',
+          padding: isDebugPanelOpen ? '16px' : '8px',
+          border: '1px solid rgba(255,255,255,0.2)',
+          backdropFilter: 'blur(8px)',
+          transition: 'all 0.3s ease',
+          cursor: 'pointer'
+        }}
+        onClick={() => setIsDebugPanelOpen(!isDebugPanelOpen)}
+        title="לחץ לפתיחת פאנל בדיקת תאריכים"
+      >
         
         {isDebugPanelOpen && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            minWidth: '200px'
-          }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              minWidth: '200px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               color: 'var(--text)',
               fontSize: '11px',
               fontWeight: '600'
             }}>
-              בדיקת תאריכים
+              <span>בדיקת תאריכים</span>
+              <button
+                onClick={() => setIsDebugPanelOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--muted)',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  padding: '0',
+                  width: '16px',
+                  height: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                title="סגור פאנל"
+              >
+                ×
+              </button>
             </div>
-            
+
             <input
               type="date"
               value={mockDate?.toISOString().split('T')[0] || ''}
@@ -979,6 +1238,7 @@ export const SagachimStatus = () => {
                   setMockDate(null)
                 }
               }}
+              onClick={(e) => e.stopPropagation()}
               style={{
                 background: 'rgba(255,255,255,0.1)',
                 border: '1px solid rgba(255,255,255,0.3)',
@@ -989,23 +1249,26 @@ export const SagachimStatus = () => {
                 fontFamily: 'Segoe UI, sans-serif'
               }}
             />
-            
+
             <div style={{
               fontSize: '10px',
               color: 'var(--muted)',
               textAlign: 'center'
             }}>
-              {mockDate 
+              {mockDate
                 ? `תאריך מדומה: ${formatDateWithSlashes(mockDate)}`
                 : `תאריך אמיתי: ${formatDateWithSlashes(new Date())}`
               }
             </div>
-            
+
             <button
-              onClick={() => setMockDate(null)}
+              onClick={(e) => {
+                e.stopPropagation()
+                setMockDate(null)
+              }}
               disabled={!mockDate}
               style={{
-                background: mockDate 
+                background: mockDate
                   ? 'linear-gradient(135deg, rgba(244,67,54,0.8), rgba(244,67,54,0.6))'
                   : 'rgba(255,255,255,0.1)',
                 border: 'none',
@@ -1020,7 +1283,8 @@ export const SagachimStatus = () => {
               איפוס לתאריך אמיתי
             </button>
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation()
                 clearAllData()
                 window.location.reload()
               }}
@@ -2424,6 +2688,26 @@ export const SagachimStatus = () => {
                             color: 'var(--muted)',
                             fontWeight: '600'
                           }}>
+                            זירה:
+                          </span>
+                          <span style={{
+                            fontSize: '12px',
+                            color: 'var(--text)'
+                          }}>
+                            {sagach.arena}
+                          </span>
+                        </div>
+
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <span style={{
+                            fontSize: '12px',
+                            color: 'var(--muted)',
+                            fontWeight: '600'
+                          }}>
                             עודכן לאחרונה:
                           </span>
                           <span style={{
@@ -2434,31 +2718,6 @@ export const SagachimStatus = () => {
                           </span>
                         </div>
 
-                        {/* Notification Subscribers Count */}
-                        {getNotificationSubscribersCount(sagach) > 0 && (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}>
-                            <span style={{
-                              fontSize: '12px',
-                              color: 'var(--muted)',
-                              fontWeight: '600'
-                            }}>
-                              התראות:
-                            </span>
-                            <span style={{
-                              fontSize: '12px',
-                              color: 'var(--accent)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              🔔 {getNotificationSubscribersCount(sagach)} משתמשים
-                            </span>
-                          </div>
-                        )}
                       </div>
                     </div>
 
@@ -2673,68 +2932,11 @@ export const SagachimStatus = () => {
                   {isNotificationToggleLoading 
                     ? 'מעדכן...' 
                     : (isUserSubscribed(selectedSagach, user?.id || 'current_user') 
-                        ? `מקבל התראות (${getNotificationSubscribersCount(selectedSagach)})` 
+                        ? 'מקבל התראות' 
                         : 'הירשם לעדכונים')
                   }
                 </button>
 
-                {/* Notification Subscribers List */}
-                {getNotificationSubscribersCount(selectedSagach) > 0 && (
-                  <div style={{
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '12px',
-                    padding: '12px',
-                    marginTop: '12px',
-                    direction: 'rtl'
-                  }}>
-                    <div style={{
-                      fontSize: '12px',
-                      color: 'var(--muted)',
-                      marginBottom: '8px',
-                      fontWeight: '600'
-                    }}>
-                      משתמשים מנויים להתראות ({getNotificationSubscribersCount(selectedSagach)})
-                    </div>
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px'
-                    }}>
-                      {selectedSagach.notificationSubscribers?.map((subscriber, index) => (
-                        <div key={index} style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          background: 'rgba(255,255,255,0.03)',
-                          borderRadius: '8px',
-                          padding: '6px 8px',
-                          fontSize: '11px'
-                        }}>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                          }}>
-                            <div style={{
-                              width: '6px',
-                              height: '6px',
-                              borderRadius: '50%',
-                              background: subscriber.notificationMethod === 'email' ? '#4CAF50' : '#25D366'
-                            }} />
-                            <span style={{ color: 'var(--text)' }}>{subscriber.userName}</span>
-                          </div>
-                          <div style={{
-                            color: 'var(--muted)',
-                            fontSize: '10px'
-                          }}>
-                            {subscriber.notificationMethod === 'email' ? '📧' : '📱'} {subscriber.notificationFrequency === 'daily' ? 'יומי' : subscriber.notificationFrequency === 'weekly' ? 'שבועי' : 'שינוי'}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Close Button */}
                 <button 
@@ -3371,19 +3573,19 @@ export const SagachimStatus = () => {
                   {PROCESS_STEPS.map((step, index) => {
                     const stepNumber = index + 1
                     // If sagach is completed (status 7), show step 6 as completed
-                    const isCurrentStep = selectedSagach.processStatus === 7 
+                    const isCurrentStep = selectedSagach.processStatus === 7
                       ? false // No current step when completed
                       : selectedSagach.processStatus === stepNumber
-                    const isCompleted = selectedSagach.processStatus === 7 
+                    const isCompleted = selectedSagach.processStatus === 7
                       ? stepNumber <= 6 // All 6 steps are completed when status is 7
                       : selectedSagach.processStatus > stepNumber
-                    const isPending = selectedSagach.processStatus === 7 
+                    const isPending = selectedSagach.processStatus === 7
                       ? false // No pending steps when completed
                       : selectedSagach.processStatus < stepNumber
                     const phaseData = selectedSagach.phaseData?.[stepNumber]
 
                     return (
-                      <div key={stepNumber} style={{
+                      <div key={`${stepNumber}-${selectedSagach.id}-${selectedSagach.processStatus}-${selectedSagach.lastUpdated}-${currentDate.getTime()}-${forceUpdate}-${immediateUpdate}`} style={{
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -3451,17 +3653,32 @@ export const SagachimStatus = () => {
                             }}>
                               <div>
                                 <strong>{calculatePhaseDays(phaseData, isCurrentStep)} ימים</strong>
+                                {phaseData.entries && phaseData.entries.length > 1 && (
+                                  <span style={{
+                                    fontSize: '10px',
+                                    color: 'var(--accent)',
+                                    marginRight: '4px'
+                                  }}>
+                                    (כולל חזרה)
+                                  </span>
+                                )}
                               </div>
-                              {phaseData.startDate && (
+                              {phaseData.entries && phaseData.entries.length > 0 && (
+                                <div style={{
+                                  fontSize: '8px',
+                                  color: 'var(--muted)',
+                                  opacity: 0.7
+                                }}>
+                                  {phaseData.entries.length} כניסות לשלב
+                                </div>
+                              )}
+                              {phaseData.currentEntry?.startDate && (
                                 <div style={{
                                   fontSize: '9px',
                                   color: 'var(--muted)',
                                   opacity: 0.8
                                 }}>
-                                  {isCompleted && phaseData.completionDate
-                                    ? `${formatDateWithSlashes(new Date(phaseData.startDate))} - ${formatDateWithSlashes(new Date(phaseData.completionDate))}`
-                                    : `החל: ${formatDateWithSlashes(new Date(phaseData.startDate))}`
-                                  }
+                                  החל: {formatDateWithSlashes(new Date(phaseData.currentEntry.startDate))}
                                 </div>
                               )}
                             </div>
@@ -3496,7 +3713,7 @@ export const SagachimStatus = () => {
                             borderRadius: '12px',
                             direction: 'rtl'
                           }}>
-                            {selectedSagach.processStatus === 7 && stepNumber === 6 ? 'הושלם לחלוטין' : 'הושלם'}
+                            {selectedSagach.processStatus === 7 && stepNumber === 6 ? 'הושלם ' : 'הושלם'}
                           </div>
                         )}
                         {isPending && (
@@ -4032,24 +4249,9 @@ export const SagachimStatus = () => {
                     notificationFrequency
                   );
                   
-                  // Add system update
-                  const systemUpdate: StatusUpdate = {
-                    id: Date.now().toString(),
-                    message: `הופעלו התראות דרך ${notificationMethod === 'email' ? 'מייל' : 'וואטסאפ'} בתדירות ${notificationFrequency === 'daily' ? 'יומית' : notificationFrequency === 'weekly' ? 'שבועית' : 'עם שינוי סטטוס'} (${getNotificationSubscribersCount(updatedSagach)} משתמשים)`,
-                    timestamp: formatDate(getCurrentDate().toISOString()),
-                    type: 'system' as const,
-                    processStatus: selectedSagach.processStatus,
-                    author: userName
-                  };
+                  updateSagachimStatus(selectedSagach.id, updatedSagach);
                   
-                  const updatedSagachWithSystemUpdate: SagachimStatusItem = {
-                    ...updatedSagach,
-                    statusUpdates: [...(updatedSagach.statusUpdates || []), systemUpdate]
-                  };
-                  
-                  updateSagachimStatus(selectedSagach.id, updatedSagachWithSystemUpdate);
-                  
-                  setSelectedSagach(updatedSagachWithSystemUpdate);
+                  setSelectedSagach(updatedSagach);
                   setIsNotificationSettingsOpen(false);
                   
                   // Show success indicator
