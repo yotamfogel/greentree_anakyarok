@@ -35,6 +35,7 @@ export interface SagachimStatusItem {
   lastUpdated: string
   arena: string
   priority: 'נמוך' | 'בינוני' | 'גבוה' | 'TOP'
+  sagachType?: string // סוג הסג"ח - optional free text field
   processStatus: 1 | 2 | 3 | 4 | 5 | 6 | 7
   processStartDate?: string
   estimatedCompletion?: string

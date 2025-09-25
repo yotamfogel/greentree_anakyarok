@@ -51,6 +51,7 @@ interface SagachimStatusItem {
   lastUpdated: string
   arena: string // זירה
   priority: PriorityOption
+  sagachType?: string // סוג הסג"ח - optional free text field
   processStatus: 1 | 2 | 3 | 4 | 5 | 6 | 7 // Current step in process chain (1-7)
   processStartDate?: string
   estimatedCompletion?: string
@@ -111,7 +112,7 @@ if (typeof document !== 'undefined' && !document.head.querySelector('#spinner-an
 }
 
 export const SagachimStatus = () => {
-  const { canEditStatus, canCreateSagach, canDeleteSagach, canChat, user } = usePermissions()
+  const { canEditStatus, canCreateSagach, canDeleteSagach, canChat, user, hasRole } = usePermissions()
   const { sagachimStatus, addSagachimStatus, updateSagachimStatus, deleteSagachimStatus, clearAllData, isLoading, error } = useSagachData()
   
   // Helper functions for notification subscribers
@@ -471,7 +472,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
     description: '',
     provider: '',
     arena: '',
-    priority: 'בינוני' as PriorityOption
+    priority: 'בינוני' as PriorityOption,
+    sagachType: ''
   })
 
   // Bottom popup indicators
@@ -492,6 +494,17 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
   // Date editing states
   const [isEditingDate, setIsEditingDate] = useState<boolean>(false)
   const [editDateValue, setEditDateValue] = useState<string>('')
+
+  // Details editing states
+  const [isEditingDetails, setIsEditingDetails] = useState<boolean>(false)
+  const [editValues, setEditValues] = useState({
+    description: '',
+    provider: '',
+    arena: '',
+    priority: 'בינוני' as PriorityOption,
+    sagachType: '',
+    processStatus: 1
+  })
 
   // Force re-render when date changes
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
@@ -637,6 +650,52 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
     return baseTotal
   }, [mockDate, currentDate]) // This callback will be recreated when mockDate or currentDate changes
 
+  // Calculate date range for a specific phase
+  const getPhaseDataRange = useCallback((phaseData: PhaseData, isCurrentPhase: boolean = false): string => {
+    if (!phaseData) return ''
+
+    const allEntries = [...(phaseData.entries || [])]
+    if (phaseData.currentEntry) {
+      allEntries.push(phaseData.currentEntry)
+    }
+
+    if (allEntries.length === 0) return ''
+
+    // Find earliest start date
+    const startDates = allEntries.map(entry => new Date(entry.startDate))
+    const earliestDate = new Date(Math.min(...startDates.map(d => d.getTime())))
+
+    // Find latest end date
+    let latestDate: Date
+    if (isCurrentPhase && phaseData.currentEntry) {
+      // If this is the current phase, use current date
+      latestDate = getCurrentDate()
+    } else {
+      // Otherwise, find the latest completion date
+      const completionDates = allEntries
+        .filter(entry => entry.completionDate)
+        .map(entry => new Date(entry.completionDate!))
+      
+      if (completionDates.length > 0) {
+        latestDate = new Date(Math.max(...completionDates.map(d => d.getTime())))
+      } else {
+        // Fallback to earliest date if no completion dates
+        latestDate = earliestDate
+      }
+    }
+
+    // Format the range
+    const startFormatted = formatDateWithSlashes(earliestDate)
+    const endFormatted = formatDateWithSlashes(latestDate)
+
+    // If same date, show only one date
+    if (startFormatted === endFormatted) {
+      return startFormatted
+    }
+
+    return `${startFormatted} - ${endFormatted}`
+  }, [getCurrentDate])
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = () => {
@@ -656,6 +715,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && selectedSagach) {
+        setIsEditingDetails(false)
         setSelectedSagach(null)
       }
     }
@@ -769,6 +829,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
   }
 
   const handleSagachClick = (sagach: SagachimStatusItem) => {
+    setIsEditingDetails(false)
     setSelectedSagach(sagach)
     setNewUpdate('')
     setEditingStatus(false)
@@ -804,6 +865,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
       
       // Close the popup if the deleted sagach was selected
       if (selectedSagach?.id === sagachId) {
+        setIsEditingDetails(false)
         setSelectedSagach(null)
       }
       
@@ -1033,6 +1095,221 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
     setEditDateValue('')
   }
 
+  // Handle details editing functions
+  const handleStartEditing = () => {
+    if (!selectedSagach) return
+    
+    setEditValues({
+      description: selectedSagach.description,
+      provider: selectedSagach.provider,
+      arena: selectedSagach.arena,
+      priority: selectedSagach.priority,
+      sagachType: selectedSagach.sagachType || '',
+      processStatus: selectedSagach.processStatus
+    })
+    setIsEditingDetails(true)
+  }
+
+  const handleSaveDetails = async () => {
+    if (!selectedSagach) return
+
+    try {
+      // Check if process status has changed to apply status change logic
+      const hasProcessStatusChanged = editValues.processStatus !== selectedSagach.processStatus
+      
+      if (hasProcessStatusChanged) {
+        // Check permission for status editing
+        if (!canEditStatus()) {
+          window.dispatchEvent(new CustomEvent('excel:status', { 
+            detail: { 
+              message: 'אין לך הרשאה לערוך סטטוסים', 
+              type: 'error', 
+              durationMs: 3000 
+            } 
+          }))
+          return
+        }
+
+        // Apply the same logic as handleStatusChange for process status updates
+        await handleProcessStatusUpdate(editValues.processStatus as 1 | 2 | 3 | 4 | 5 | 6 | 7)
+      } else {
+        // Regular details update without status change
+        const updatedSagach = {
+          ...selectedSagach,
+          description: editValues.description.trim(),
+          provider: editValues.provider.trim(),
+          arena: editValues.arena.trim(),
+          priority: editValues.priority,
+          sagachType: editValues.sagachType.trim() || undefined,
+          lastUpdated: formatDateWithSlashes(getCurrentDate())
+        }
+
+        const updates: any = {
+          description: editValues.description.trim(),
+          provider: editValues.provider.trim(),
+          arena: editValues.arena.trim(),
+          priority: editValues.priority,
+          lastUpdated: formatDateWithSlashes(getCurrentDate())
+        }
+        
+        if (editValues.sagachType.trim()) {
+          updates.sagachType = editValues.sagachType.trim()
+        } else {
+          updates.sagachType = undefined
+        }
+        
+        updateSagachimStatus(selectedSagach.id, updates)
+        
+        setSelectedSagach(updatedSagach)
+        setIsEditingDetails(false)
+        showPopupIndicator('פרטי הסג"ח עודכנו בהצלחה', 'success')
+      }
+
+    } catch (error) {
+      console.error('Error updating sagach details:', error)
+      showPopupIndicator('שגיאה בעדכון פרטי הסג"ח', 'warning')
+    }
+  }
+
+  // Handle process status update with full phase data logic
+  const handleProcessStatusUpdate = async (newProcessStatus: 1 | 2 | 3 | 4 | 5 | 6 | 7) => {
+    if (!selectedSagach || newProcessStatus === selectedSagach.processStatus) return
+
+    try {
+      // Calculate days spent in previous phase for the message
+      let daysInPreviousPhase = 0
+      if (selectedSagach.phaseData?.[selectedSagach.processStatus]?.currentEntry?.startDate) {
+        const phaseData = selectedSagach.phaseData[selectedSagach.processStatus]
+        daysInPreviousPhase = calculatePhaseDays(phaseData, true)
+      }
+
+      const statusUpdate: StatusUpdate = {
+        id: Date.now().toString(),
+        message: `שונה סטטוס מ-"${selectedSagach.processStatus === 7 ? 'מובצע' : PROCESS_STEPS[selectedSagach.processStatus - 1]}" ל-"${newProcessStatus === 7 ? 'מובצע' : PROCESS_STEPS[newProcessStatus - 1]}"${daysInPreviousPhase > 0 ? ` •בשלב הקודם ${daysInPreviousPhase} ימים` : ''}`,
+        timestamp: formatDate(getCurrentDate().toISOString()),
+        type: 'status_change',
+        oldStatus: selectedSagach.processStatus,
+        newStatus: newProcessStatus,
+        processStatus: selectedSagach.processStatus,
+        author: user?.name || 'משתמש'
+      }
+    
+      // Update phase data when changing status
+      const currentDate = getCurrentDate()
+      const currentPhaseData = { ...(selectedSagach.phaseData || {}) }
+
+      // Complete the current phase
+      if (selectedSagach.phaseData?.[selectedSagach.processStatus]?.currentEntry?.startDate) {
+        const currentPhase = currentPhaseData[selectedSagach.processStatus] || {}
+
+        // Calculate time spent in current entry
+        const startDate = new Date(currentPhase.currentEntry!.startDate + 'T00:00:00')
+        const endDate = new Date(currentDate.toISOString().split('T')[0] + 'T23:59:59')
+        const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+        const timeSpentDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+        // Create completed entry
+        const completedEntry: PhaseEntry = {
+          startDate: currentPhase.currentEntry!.startDate,
+          completionDate: currentDate.toISOString().split('T')[0],
+          timeSpentDays: timeSpentDays
+        }
+
+        // Update phase data with new entry
+        currentPhaseData[selectedSagach.processStatus] = {
+          entries: [...(currentPhase.entries || []), completedEntry],
+          currentEntry: undefined,
+          totalTimeSpentDays: timeSpentDays
+        }
+      }
+
+      // Start the new phase (unless it's completion status 7)
+      if (newProcessStatus < 7) {
+        const newPhaseData = currentPhaseData[newProcessStatus] || {}
+
+        // Check if this phase already has a currentEntry (when returning to a previous phase)
+        const hasCurrentEntry = newPhaseData.currentEntry
+
+        // If returning to a phase that already has currentEntry, create a new entry
+        if (hasCurrentEntry) {
+          // Complete the existing current entry
+          const completedEntry: PhaseEntry = {
+            startDate: newPhaseData.currentEntry!.startDate,
+            completionDate: currentDate.toISOString().split('T')[0],
+            timeSpentDays: Math.ceil(Math.abs(new Date(currentDate.toISOString().split('T')[0] + 'T23:59:59').getTime() - new Date(newPhaseData.currentEntry!.startDate + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24))
+          }
+
+          currentPhaseData[newProcessStatus] = {
+            ...newPhaseData,
+            entries: [...(newPhaseData.entries || []), completedEntry],
+            currentEntry: {
+              startDate: currentDate.toISOString().split('T')[0],
+              timeSpentDays: 0
+            },
+            totalTimeSpentDays: Math.max(
+              calculatePhaseDays(newPhaseData, false) + completedEntry.timeSpentDays,
+              (newPhaseData.totalTimeSpentDays || 0)
+            )
+          }
+        } else {
+          // First time entering this phase
+          const newEntry: PhaseEntry = {
+            startDate: currentDate.toISOString().split('T')[0],
+            timeSpentDays: 0
+          }
+
+          currentPhaseData[newProcessStatus] = {
+            ...newPhaseData,
+            currentEntry: newEntry,
+            totalTimeSpentDays: Math.max(calculatePhaseDays(newPhaseData, false), newPhaseData.totalTimeSpentDays || 0)
+          }
+        }
+      }
+
+      const updatedSagach = {
+        ...selectedSagach,
+        description: editValues.description.trim(),
+        provider: editValues.provider.trim(),
+        arena: editValues.arena.trim(),
+        priority: editValues.priority,
+        sagachType: editValues.sagachType.trim() || undefined,
+        processStatus: newProcessStatus,
+        statusUpdates: [...(selectedSagach.statusUpdates || []), statusUpdate],
+        lastUpdated: formatDateWithSlashes(currentDate),
+        phaseData: currentPhaseData,
+        // Set completion date if status is changed to "מובצע" (7)
+        completionDate: newProcessStatus === 7 ? currentDate.toISOString() : selectedSagach.completionDate
+      }
+      
+      console.log('🔄 Changing status of sagach:', selectedSagach.name, 'to status', newProcessStatus)
+      updateSagachimStatus(selectedSagach.id, updatedSagach)
+      
+      setSelectedSagach(updatedSagach)
+      setIsEditingDetails(false)
+      
+      // Show success indicator
+      showPopupIndicator(
+        `פרטים נשמרו וסטטוס עודכן ל-"${newProcessStatus === 7 ? 'מובצע' : PROCESS_STEPS[newProcessStatus - 1]}"`,
+        'success'
+      )
+    } catch (error) {
+      console.error('Error updating process status:', error)
+      showPopupIndicator('שגיאה בעדכון השלב בתהליך', 'warning')
+    }
+  }
+
+  const handleCancelEditing = () => {
+    setIsEditingDetails(false)
+    setEditValues({
+      description: '',
+      provider: '',
+      arena: '',
+      priority: 'בינוני' as PriorityOption,
+      sagachType: '',
+      processStatus: 1
+    })
+  }
+
   // Filter removal functions
   const removeProviderFilter = () => {
     setSelectedProvider('')
@@ -1089,6 +1366,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         lastUpdated: formatDateWithSlashes(getCurrentDate()),
         arena: newSagachForm.arena.trim(),
         priority: newSagachForm.priority,
+        sagachType: newSagachForm.sagachType.trim() || undefined,
         processStatus: 1,
         processStartDate: getCurrentDate().toISOString().split('T')[0],
         estimatedCompletion: '-', // Default value
@@ -1097,7 +1375,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         notifications: false,
         statusUpdates: [{
           id: Date.now().toString(),
-          message: `נוצר סג"ח חדש: "${newSagachForm.name.trim()}" • ספק: ${newSagachForm.provider.trim()} • זירה: ${newSagachForm.arena.trim()}`,
+          message: `נוצר סג"ח חדש: "${newSagachForm.name.trim()}" • ספק: ${newSagachForm.provider.trim()} • זירה: ${newSagachForm.arena.trim()}${newSagachForm.sagachType.trim() ? ` • סוג: ${newSagachForm.sagachType.trim()}` : ''}`,
           timestamp: formatDate(getCurrentDate().toISOString()),
           type: 'system' as const,
           processStatus: 1,
@@ -1117,7 +1395,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
       addSagachimStatus(newSagach);
       
       // Reset form and close popup
-      setNewSagachForm({ name: '', description: '', provider: '', arena: '', priority: 'בינוני' as PriorityOption })
+      setNewSagachForm({ name: '', description: '', provider: '', arena: '', priority: 'בינוני' as PriorityOption, sagachType: '' })
       setIsNewSagachPopupOpen(false)
       
       // Open the new sagach for editing
@@ -2776,7 +3054,6 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                           <span style={{
                             fontSize: '12px',
                             
-                            fontWeight: sagach.priority === 'TOP' ? 700 : 400
                           }}>
                             {PRIORITY_LABELS[sagach.priority]}
                           </span>
@@ -2878,7 +3155,10 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         background: 'rgba(0, 0, 0, 0.8)',
         backdropFilter: 'blur(8px)',
         zIndex: 1000
-      }} onClick={() => setSelectedSagach(null)}>
+      }} onClick={() => {
+        setIsEditingDetails(false)
+        setSelectedSagach(null)
+      }}>
         <div style={{
           background: 'radial-gradient(1200px 800px at 50% 50%, rgba(124,192,255,0.15), transparent 50%), radial-gradient(1000px 700px at 50% 50%, rgba(167, 90, 255, 0.12), transparent 50%), var(--bg)',
           border: 'none',
@@ -3024,7 +3304,10 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
 
                 {/* Close Button */}
                 <button 
-                  onClick={() => setSelectedSagach(null)}
+                  onClick={() => {
+                    setIsEditingDetails(false)
+                    setSelectedSagach(null)
+                  }}
                   style={{
                     ...buttonStyles.close,
                     fontSize: '28px',
@@ -3082,6 +3365,106 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                 פרטי הסג"ח
               </h4>
 
+              {/* Edit Button (Admin Only) */}
+              {hasRole('admin') && (
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  gap: '12px', 
+                  marginBottom: '20px' 
+                }}>
+                  {!isEditingDetails ? (
+                    <button
+                      onClick={handleStartEditing}
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(255,193,7,0.8), rgba(255,193,7,0.6))',
+                        border: 'none',
+                        borderRadius: '12px',
+                        color: 'white',
+                        padding: '10px 20px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        fontFamily: 'Segoe UI, sans-serif',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)'
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(255,193,7,0.3)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    >
+                      ✏️ ערוך פרטים
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleSaveDetails}
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(76,175,80,0.8), rgba(76,175,80,0.6))',
+                          border: 'none',
+                          borderRadius: '12px',
+                          color: 'white',
+                          padding: '10px 20px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          fontFamily: 'Segoe UI, sans-serif',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)'
+                          e.currentTarget.style.boxShadow = '0 6px 20px rgba(76,175,80,0.3)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)'
+                          e.currentTarget.style.boxShadow = 'none'
+                        }}
+                      >
+                        ✅ שמור
+                      </button>
+                      <button
+                        onClick={handleCancelEditing}
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(244,67,54,0.8), rgba(244,67,54,0.6))',
+                          border: 'none',
+                          borderRadius: '12px',
+                          color: 'white',
+                          padding: '10px 20px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          fontFamily: 'Segoe UI, sans-serif',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)'
+                          e.currentTarget.style.boxShadow = '0 6px 20px rgba(244,67,54,0.3)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)'
+                          e.currentTarget.style.boxShadow = 'none'
+                        }}
+                      >
+                        ❌ בטל
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
                {/* Sagach Details */}
                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '16px' }}>
                 {/* 1. תיאור */}
@@ -3094,14 +3477,46 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                   }}>
                     תיאור
                   </h4>
-                  <p style={{ 
-                    color: 'var(--text)', 
-                    fontSize: '16px', 
-                    margin: 0, 
-                    lineHeight: '1.6' 
-                  }}>
-                    {selectedSagach.description}
-                  </p>
+                  {isEditingDetails ? (
+                    <textarea
+                      value={editValues.description}
+                      onChange={(e) => setEditValues(prev => ({ ...prev, description: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        minHeight: '80px',
+                        padding: '12px 16px',
+                        background: 'rgba(255,255,255,0.08)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '12px',
+                        color: 'var(--text)',
+                        fontSize: '16px',
+                        fontFamily: 'Segoe UI, sans-serif',
+                        outline: 'none',
+                        transition: 'all 0.2s ease',
+                        direction: 'rtl',
+                        resize: 'vertical',
+                        lineHeight: '1.6',
+                        boxSizing: 'border-box'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = 'rgba(124,192,255,0.6)'
+                        e.target.style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(255,255,255,0.2)'
+                        e.target.style.boxShadow = 'none'
+                      }}
+                    />
+                  ) : (
+                    <p style={{ 
+                      color: 'var(--text)', 
+                      fontSize: '16px', 
+                      margin: 0, 
+                      lineHeight: '1.6' 
+                    }}>
+                      {selectedSagach.description}
+                    </p>
+                  )}
                 </div>
 
                 {/* 2. ספק */}
@@ -3114,14 +3529,44 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                   }}>
                     ספק
                   </h4>
-                  <p style={{ 
-                    color: 'var(--text)', 
-                    fontSize: '18px', 
-                    margin: 0,
-                    lineHeight: '1.8' 
-                  }}>
-                    {selectedSagach.provider}
-                  </p>
+                  {isEditingDetails ? (
+                    <input
+                      type="text"
+                      value={editValues.provider}
+                      onChange={(e) => setEditValues(prev => ({ ...prev, provider: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        background: 'rgba(255,255,255,0.08)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '12px',
+                        color: 'var(--text)',
+                        fontSize: '18px',
+                        fontFamily: 'Segoe UI, sans-serif',
+                        outline: 'none',
+                        transition: 'all 0.2s ease',
+                        direction: 'rtl',
+                        boxSizing: 'border-box'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = 'rgba(124,192,255,0.6)'
+                        e.target.style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(255,255,255,0.2)'
+                        e.target.style.boxShadow = 'none'
+                      }}
+                    />
+                  ) : (
+                    <p style={{ 
+                      color: 'var(--text)', 
+                      fontSize: '18px', 
+                      margin: 0,
+                      lineHeight: '1.8' 
+                    }}>
+                      {selectedSagach.provider}
+                    </p>
+                  )}
                 </div>
 
                 {/* 3. זירה */}
@@ -3134,14 +3579,44 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                   }}>
                     זירה
                   </h4>
-                  <p style={{ 
-                    color: 'var(--text)', 
-                    fontSize: '18px', 
-                    margin: 0,
-                    lineHeight: '1.8' 
-                  }}>
-                    {selectedSagach.arena}
-                  </p>
+                  {isEditingDetails ? (
+                    <input
+                      type="text"
+                      value={editValues.arena}
+                      onChange={(e) => setEditValues(prev => ({ ...prev, arena: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        background: 'rgba(255,255,255,0.08)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '12px',
+                        color: 'var(--text)',
+                        fontSize: '18px',
+                        fontFamily: 'Segoe UI, sans-serif',
+                        outline: 'none',
+                        transition: 'all 0.2s ease',
+                        direction: 'rtl',
+                        boxSizing: 'border-box'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = 'rgba(124,192,255,0.6)'
+                        e.target.style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(255,255,255,0.2)'
+                        e.target.style.boxShadow = 'none'
+                      }}
+                    />
+                  ) : (
+                    <p style={{ 
+                      color: 'var(--text)', 
+                      fontSize: '18px', 
+                      margin: 0,
+                      lineHeight: '1.8' 
+                    }}>
+                      {selectedSagach.arena}
+                    </p>
+                  )}
                 </div>
 
                 {/* 3b. תעדוף */}
@@ -3154,7 +3629,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                   }}>
                     תעדוף
                   </h4>
-                  {canEditStatus() ? (
+                  {isEditingDetails ? (
                     <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
@@ -3177,7 +3652,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                           width: '100%'
                         }}
                       >
-                        <span>{PRIORITY_LABELS[selectedSagach.priority]}</span>
+                        <span>{PRIORITY_LABELS[editValues.priority]}</span>
                         <span style={{ marginLeft: '8px', fontSize: '12px' }}>▼</span>
                       </button>
 
@@ -3197,14 +3672,10 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                         }}>
                           {PRIORITY_OPTIONS.map(option => (
                             <div
-                              key={`detail-priority-${option}`}
+                              key={`edit-priority-${option}`}
                               onClick={() => {
                                 setIsPriorityDropdownOpen(false)
-                                if (!selectedSagach || option === selectedSagach.priority) return
-                                const updatedSagach = { ...selectedSagach, priority: option }
-                                updateSagachimStatus(selectedSagach.id, { priority: option })
-                                setSelectedSagach(updatedSagach)
-                                showPopupIndicator('התעדוף עודכן בהצלחה', 'success')
+                                setEditValues(prev => ({ ...prev, priority: option }))
                               }}
                               style={{
                                 padding: '10px 16px',
@@ -3215,20 +3686,20 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
-                                background: selectedSagach.priority === option ? 'rgba(124,192,255,0.15)' : 'transparent',
+                                background: editValues.priority === option ? 'rgba(124,192,255,0.15)' : 'transparent',
                                 fontWeight: option === 'TOP' ? 700 : 500
                               }}
                               onMouseEnter={(e) => {
                                 (e.currentTarget as HTMLDivElement).style.background = 'rgba(124,192,255,0.15)'
                               }}
                               onMouseLeave={(e) => {
-                                if (selectedSagach.priority !== option) {
+                                if (editValues.priority !== option) {
                                   (e.currentTarget as HTMLDivElement).style.background = 'transparent'
                                 }
                               }}
                             >
                               <span>{option === 'TOP' ? 'TOP' : option}</span>
-                              {option === selectedSagach.priority && <span>✓</span>}
+                              {option === editValues.priority && <span>✓</span>}
                             </div>
                           ))}
                         </div>
@@ -3236,13 +3707,156 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                     </div>
                   ) : (
                     <p style={{ 
-                      color: selectedSagach.priority === 'TOP' ? '#ffd700' : 'var(--text)', 
                       fontSize: '18px', 
                       margin: 0,
                       lineHeight: '1.8',
-                      fontWeight: selectedSagach.priority === 'TOP' ? '700' : '500'
                     }}>
                       {PRIORITY_LABELS[selectedSagach.priority]}
+                    </p>
+                  )}
+                </div>
+
+                {/* 3c. סוג הסג"ח */}
+                {(isEditingDetails || selectedSagach.sagachType) && (
+                  <div>
+                    <h4 style={{ 
+                      color: 'rgba(124,192,255,0.9)', 
+                      fontSize: '18px', 
+                      fontWeight: '600', 
+                      margin: '0 0 8px 0' 
+                    }}>
+                      סוג הסג"ח
+                    </h4>
+                    {isEditingDetails ? (
+                      <input
+                        type="text"
+                        value={editValues.sagachType}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, sagachType: e.target.value }))}
+                        placeholder="הכנס סוג הסג'ח (אופציונלי)..."
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: '12px',
+                          color: 'var(--text)',
+                          fontSize: '18px',
+                          fontFamily: 'Segoe UI, sans-serif',
+                          outline: 'none',
+                          transition: 'all 0.2s ease',
+                          direction: 'rtl',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = 'rgba(124,192,255,0.6)'
+                          e.target.style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = 'rgba(255,255,255,0.2)'
+                          e.target.style.boxShadow = 'none'
+                        }}
+                      />
+                    ) : (
+                      <p style={{ 
+                        color: 'var(--text)', 
+                        fontSize: '18px', 
+                        margin: 0,
+                        lineHeight: '1.8' 
+                      }}>
+                        {selectedSagach.sagachType}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* 3d. שלב בתהליך */}
+                <div>
+                  <h4 style={{ 
+                    color: 'rgba(124,192,255,0.9)', 
+                    fontSize: '18px', 
+                    fontWeight: '600', 
+                    margin: '0 0 8px 0' 
+                  }}>
+                    שלב בתהליך
+                  </h4>
+                  {isEditingDetails ? (
+                    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => setIsProcessStatusDropdownOpen(prev => !prev)}
+                        style={{
+                          appearance: 'none',
+                          border: '1px solid rgba(255,255,255,0.14)',
+                          background: 'rgba(255,255,255,0.06)',
+                          borderRadius: '12px',
+                          color: '#ffffff',
+                          padding: '10px 16px',
+                          cursor: 'pointer',
+                          fontSize: '16px',
+                          direction: 'rtl',
+                          outline: 'none',
+                          fontFamily: 'Segoe UI, sans-serif',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          width: '100%'
+                        }}
+                      >
+                        <span>{PROCESS_STEPS_WITH_COMPLETED[editValues.processStatus - 1]}</span>
+                        <span style={{ marginLeft: '8px', fontSize: '12px' }}>▼</span>
+                      </button>
+
+                      {isProcessStatusDropdownOpen && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 4px)',
+                          right: 0,
+                          left: 0,
+                          background: 'var(--panel)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '12px',
+                          zIndex: 1000,
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                          backdropFilter: 'blur(8px)',
+                          overflow: 'hidden'
+                        }}>
+                          {PROCESS_STEPS_WITH_COMPLETED.map((step, index) => (
+                            <div
+                              key={index + 1}
+                              onClick={() => {
+                                setEditValues(prev => ({ ...prev, processStatus: index + 1 }))
+                                setIsProcessStatusDropdownOpen(false)
+                              }}
+                              style={{
+                                padding: '12px 16px',
+                                cursor: 'pointer',
+                                borderBottom: index < PROCESS_STEPS_WITH_COMPLETED.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                                transition: 'background 0.2s ease',
+                                fontSize: '14px',
+                                direction: 'rtl',
+                                color: editValues.processStatus === index + 1 ? 'rgba(124,192,255,1)' : '#ffffff'
+                              }}
+                              onMouseEnter={(e) => {
+                                (e.target as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)'
+                              }}
+                              onMouseLeave={(e) => {
+                                (e.target as HTMLDivElement).style.background = 'transparent'
+                              }}
+                            >
+                              {step}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p style={{ 
+                      color: 'var(--text)', 
+                      fontSize: '18px', 
+                      margin: 0,
+                      lineHeight: '1.8' 
+                    }}>
+                      {PROCESS_STEPS_WITH_COMPLETED[selectedSagach.processStatus - 1]}
                     </p>
                   )}
                 </div>
@@ -3371,7 +3985,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                   </h4>
                   
                   {!isEditingDate ? (
-                    canEditStatus() ? (
+                    isEditingDetails && canEditStatus() ? (
                       <p 
                         style={{ 
                           color: 'var(--text)', 
@@ -3498,219 +4112,6 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                     </div>
                   )}
                 </div>
-              </div>
-              
-              {/* Edit Status Button */}
-              <div style={{
-                marginTop: '24px',
-                paddingTop: '20px',
-                borderTop: '2px solid rgba(255,255,255,0.2)',
-                display: 'flex',
-                justifyContent: 'center'
-              }}>
-                {!editingStatus ? (
-                  canEditStatus() && (
-                    <button
-                      onClick={() => setEditingStatus(true)}
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(124,192,255,0.8), rgba(124,192,255,0.6))',
-                      border: 'none',
-                      borderRadius: '12px',
-                      padding: '12px 24px',
-                      color: 'white',
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      direction: 'rtl',
-                      fontFamily: 'Segoe UI, sans-serif'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(124,192,255,0.4)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0px)'
-                      e.currentTarget.style.boxShadow = 'none'
-                    }}
-                  >
-                    🔄 עדכן סטטוס בתהליך
-                  </button>
-                  )
-                ) : (
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px',
-                    alignItems: 'center',
-                    width: '100%'
-                  }}>
-                    <div style={{ position: 'relative', minWidth: '200px' }} onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => setIsStatusEditDropdownOpen(!isStatusEditDropdownOpen)}
-                        style={{
-                          appearance: 'none' as const,
-                          border: '1px solid rgba(255,255,255,0.14)',
-                          background: 'rgba(255,255,255,0.06)',
-                          color: 'var(--text)',
-                          borderRadius: '12px',
-                          padding: '8px 14px',
-                          cursor: 'pointer',
-                          transition: 'transform 120ms ease, box-shadow 200ms ease, background 200ms ease',
-                          backdropFilter: 'blur(6px)',
-                          fontSize: '14px',
-                          direction: 'rtl',
-                          outline: 'none',
-                          fontFamily: 'Segoe UI, sans-serif',
-                          width: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          textAlign: 'right'
-                        }}
-                        onMouseEnter={(e) => {
-                          (e.target as HTMLButtonElement).style.transform = 'translateY(-1px)'
-                          ;(e.target as HTMLButtonElement).style.boxShadow = '0 6px 22px rgba(124,192,255,0.24)'
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.target as HTMLButtonElement).style.transform = 'translateY(0px)'
-                          ;(e.target as HTMLButtonElement).style.boxShadow = 'none'
-                        }}
-                      >
-                        <span>{PROCESS_STEPS_WITH_COMPLETED[newStatusValue - 1]}</span>
-                        <span style={{ marginLeft: '8px' }}>▼</span>
-                      </button>
-                      {isStatusEditDropdownOpen && (
-                        <div style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          right: 0,
-                          background: 'var(--panel)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '12px',
-                          marginTop: '4px',
-                          zIndex: 1000,
-                          maxHeight: '200px',
-                          overflowY: 'auto',
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-                          backdropFilter: 'blur(8px)'
-                        }}>
-                          {PROCESS_STEPS_WITH_COMPLETED.map((step, index) => (
-                            <div
-                              key={index + 1}
-                              onClick={() => {
-                                setNewStatusValue(index + 1)
-                                setIsStatusEditDropdownOpen(false)
-                              }}
-                              style={{
-                                padding: '8px 12px',
-                                cursor: 'pointer',
-                                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                                transition: 'background 0.2s ease',
-                                fontSize: '14px',
-                                color: '#ffffff',
-                                textAlign: 'center',
-                                direction: 'rtl'
-                              }}
-                              onMouseEnter={(e) => {
-                                (e.target as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)'
-                              }}
-                              onMouseLeave={(e) => {
-                                (e.target as HTMLDivElement).style.background = 'transparent'
-                              }}
-                            >
-                              {step}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{
-                      display: 'flex',
-                      gap: '12px'
-                    }}>
-                      {canEditStatus() && (
-                        <button
-                          onClick={handleStatusChange}
-                          disabled={isStatusChangeLoading}
-                        style={{
-                          background: isStatusChangeLoading 
-                            ? 'linear-gradient(135deg, rgba(76,175,80,0.4), rgba(76,175,80,0.3))'
-                            : 'linear-gradient(135deg, rgba(76,175,80,0.8), rgba(76,175,80,0.6))',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '8px 16px',
-                          color: 'white',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          cursor: isStatusChangeLoading ? 'not-allowed' : 'pointer',
-                          transition: 'all 0.2s ease',
-                          direction: 'rtl',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          opacity: isStatusChangeLoading ? 0.7 : 1
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isStatusChangeLoading) {
-                            e.currentTarget.style.transform = 'translateY(-1px)'
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(76,175,80,0.4)'
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isStatusChangeLoading) {
-                            e.currentTarget.style.transform = 'translateY(0px)'
-                            e.currentTarget.style.boxShadow = 'none'
-                          }
-                        }}
-                      >
-                        {isStatusChangeLoading ? (
-                          <div style={{
-                            width: '16px',
-                            height: '16px',
-                            border: '2px solid transparent',
-                            borderTop: '2px solid currentColor',
-                            borderRadius: '50%',
-                            animation: 'spin 1s linear infinite'
-                          }} />
-                        ) : (
-                          '✅'
-                        )}
-                        {isStatusChangeLoading ? 'משמור...' : 'שמור'}
-                      </button>
-                      )}
-                      <button
-                        onClick={() => {
-                          setEditingStatus(false)
-                          setNewStatusValue(selectedSagach.processStatus)
-                        }}
-                        style={{
-                          background: 'rgba(255,255,255,0.1)',
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          borderRadius: '8px',
-                          padding: '8px 16px',
-                          color: 'var(--text)',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          direction: 'rtl'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
-                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
-                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'
-                        }}
-                      >
-                        ❌ ביטול
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -3850,13 +4251,13 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                                   </span>
                                 )}
                               </div>
-                              {phaseData.entries && phaseData.entries.length > 0 && (
+                              {((phaseData.entries && phaseData.entries.length > 0) || phaseData.currentEntry) && (
                                 <div style={{
                                   fontSize: '8px',
                                   color: 'var(--muted)',
                                   opacity: 0.7
                                 }}>
-                                  {phaseData.entries.length} כניסות לשלב
+                                  {getPhaseDataRange(phaseData, isCurrentStep)}
                                 </div>
                               )}
                               {phaseData.currentEntry?.startDate && (
@@ -4511,7 +4912,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
       }} onClick={() => {
         if (!isCreateSagachLoading) {
           setIsNewSagachPopupOpen(false)
-          setNewSagachForm({ name: '', description: '', provider: '', arena: '' })
+          setNewSagachForm({ name: '', description: '', provider: '', arena: '', priority: 'בינוני' as PriorityOption, sagachType: '' })
         }
       }}>
         <div style={{
@@ -4635,6 +5036,54 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                   direction: 'rtl',
                   resize: 'vertical',
                   minHeight: '80px',
+                  opacity: isCreateSagachLoading ? 0.6 : 1,
+                  cursor: isCreateSagachLoading ? 'not-allowed' : 'text',
+                  boxSizing: 'border-box'
+                }}
+                onFocus={(e) => {
+                  if (!isCreateSagachLoading) {
+                    e.target.style.borderColor = 'rgba(124,192,255,0.6)'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
+                  }
+                }}
+                onBlur={(e) => {
+                  if (!isCreateSagachLoading) {
+                    e.target.style.borderColor = 'rgba(255,255,255,0.2)'
+                    e.target.style.boxShadow = 'none'
+                  }
+                }}
+              />
+            </div>
+
+            {/* Sagach Type */}
+            <div>
+              <label style={{
+                display: 'block',
+                color: 'var(--text)',
+                fontSize: '16px',
+                fontWeight: '600',
+                marginBottom: '8px'
+              }}>
+                סוג הסג"ח
+              </label>
+              <input
+                type="text"
+                value={newSagachForm.sagachType}
+                onChange={(e) => setNewSagachForm(prev => ({ ...prev, sagachType: e.target.value }))}
+                placeholder="הכנס סוג הסג'ח (אופציונלי)..."
+                disabled={isCreateSagachLoading}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '12px',
+                  color: 'var(--text)',
+                  fontSize: '14px',
+                  fontFamily: 'Segoe UI, sans-serif',
+                  outline: 'none',
+                  transition: 'all 0.2s ease',
+                  direction: 'rtl',
                   opacity: isCreateSagachLoading ? 0.6 : 1,
                   cursor: isCreateSagachLoading ? 'not-allowed' : 'text',
                   boxSizing: 'border-box'
@@ -4904,7 +5353,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
               onClick={() => {
                 if (!isCreateSagachLoading) {
                   setIsNewSagachPopupOpen(false)
-                  setNewSagachForm({ name: '', description: '', provider: '', arena: '', priority: 'בינוני' as PriorityOption })
+                  setNewSagachForm({ name: '', description: '', provider: '', arena: '', priority: 'בינוני' as PriorityOption, sagachType: '' })
                 }
               }}
               disabled={isCreateSagachLoading}
