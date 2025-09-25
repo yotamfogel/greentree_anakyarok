@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { usePermissions } from '../contexts/PermissionContext'
-import { useSagachData } from '../contexts/SagachDataContext'
+import { useSagachData, ARENA_OPTIONS, type ArenaOption, type PhaseEntry, type PhaseData } from '../contexts/SagachDataContext'
 
 // Custom date formatting function to use '/' instead of '.'
 const formatDateWithSlashes = (date: Date): string => {
@@ -19,17 +19,6 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
-interface PhaseEntry {
-  startDate: string
-  completionDate?: string
-  timeSpentDays: number
-}
-
-interface PhaseData {
-  entries?: PhaseEntry[] // History of all entries to this phase
-  currentEntry?: PhaseEntry // Current active entry (for ongoing phases)
-  totalTimeSpentDays?: number // Total time spent in this phase across all entries
-}
 
 interface StatusUpdate {
   id: string
@@ -68,7 +57,7 @@ interface SagachimStatusItem {
   description: string
   provider: string
   lastUpdated: string
-  arena: string // זירה
+  arena: ArenaOption[] // זירה - רשימת זירות
   priority: PriorityOption
   sagachType?: string // סוג הסג"ח - optional free text field
   processStatus: 1 | 2 | 3 | 4 | 5 | 6 | 7 // Current step in process chain (1-7)
@@ -237,233 +226,14 @@ export const SagachimStatus = () => {
     }
   }
   
-  // Default sample data
-const getDefaultSagachim = (): SagachimStatusItem[] => [
-    {
-      id: 'sagach1',
-      name: 'סג"ח ראשי',
-      description: 'סג"ח ראשי לניהול נתוני משתמשים',
-      provider: 'מחלקת IT',
-      lastUpdated: '2024-01-15',
-      arena: 'ניהול נתונים',
-      priority: 'גבוה',
-      processStatus: 3, // חזר לשלב 3 (בתהליכי אפיון)
-      processStartDate: '2024-01-01',
-      estimatedCompletion: '2024-02-15',
-      contactPerson: 'יוסי כהן',
-      notes: 'חזר לשלב אפיון - צפוי להסתיים בזמן',
-      attachments: [],
-      notifications: false,
-      statusUpdates: [],
-      notificationSubscribers: [],
-      phaseData: {
-        1: {
-          entries: [{ startDate: '2024-01-01', completionDate: '2024-01-07', timeSpentDays: 6 }],
-          totalTimeSpentDays: 6
-        },
-        2: {
-          entries: [{ startDate: '2024-01-08', completionDate: '2024-01-15', timeSpentDays: 7 }],
-          totalTimeSpentDays: 7
-        },
-        3: {
-          entries: [
-            { startDate: '2024-01-16', completionDate: '2024-01-25', timeSpentDays: 9 }, // שהייה ראשונה
-            { startDate: '2024-01-31', timeSpentDays: 0 } // שהייה שנייה - נוכחית
-          ],
-          currentEntry: { startDate: '2024-01-31', timeSpentDays: 0 },
-          totalTimeSpentDays: 9 // סה"כ מהשהייה הראשונה
-        },
-        4: {
-          entries: [{ startDate: '2024-01-26', completionDate: '2024-01-30', timeSpentDays: 4 }],
-          totalTimeSpentDays: 4
-        },
-        5: {
-          totalTimeSpentDays: 0
-        },
-        6: {}, 7: {} // Not started yet
-      }
-    },
-    {
-      id: 'sagach2',
-      name: 'סג"ח משני',
-      description: 'סג"ח משני לניהול כתובות',
-      provider: 'מחלקת IT',
-      lastUpdated: '2024-01-10',
-      arena: 'ביטחון ואבטחה',
-      priority: 'בינוני',
-      processStatus: 2,
-      processStartDate: '2024-01-05',
-      estimatedCompletion: '2024-03-01',
-      contactPerson: 'שרה לוי',
-      notes: 'ממתינים לאישור נוסף מהספק',
-      attachments: [],
-      notifications: false,
-      statusUpdates: [],
-      notificationSubscribers: [],
-      phaseData: {
-        1: {
-          entries: [{ startDate: '2024-01-05', completionDate: '2024-01-12', timeSpentDays: 7 }],
-          totalTimeSpentDays: 7
-        },
-        2: {
-          currentEntry: { startDate: '2024-01-13', timeSpentDays: 0 },
-          totalTimeSpentDays: 0
-        },
-        3: {}, 4: {}, 5: {}, 6: {}, 7: {}
-      }
-    },
-    {
-      id: 'sagach3',
-      name: 'סג"ח תשלומים',
-      description: 'סג"ח לניהול תשלומים וחשבוניות',
-      provider: 'מחלקת כספים',
-      lastUpdated: '2024-01-08',
-      arena: 'פיתוח עסקי',
-      priority: 'נמוך',
-      processStatus: 1,
-      processStartDate: '2024-01-08',
-      estimatedCompletion: '2024-04-01',
-      contactPerson: 'דני אברהם',
-      notes: 'ממתינים לבשלות מצד הספק',
-      notifications: true,
-      statusUpdates: [],
-      phaseData: {
-        1: {
-          currentEntry: { startDate: '2024-01-08', timeSpentDays: 0 },
-          totalTimeSpentDays: 0
-        },
-        2: {}, 3: {}, 4: {}, 5: {}, 6: {}, 7: {}
-      }
-    },
-    {
-      id: 'sagach4',
-      name: 'פפסי',
-      description: 'הנגישות ממודרת',
-      provider: 'שב"כ',
-      lastUpdated: '2024-01-12',
-      arena: '190',
-      priority: 'גבוה',
-      processStatus: 6,
-      processStartDate: '2023-11-01',
-      estimatedCompletion: '2024-01-15',
-      contactPerson: 'מיכל דוד',
-      notes: 'הושלם בהצלחה!',
-      attachments: [],
-      notifications: false,
-      statusUpdates: [],
-      notificationSubscribers: [],
-      phaseData: {
-        1: {
-          entries: [{ startDate: '2023-11-01', completionDate: '2023-11-10', timeSpentDays: 9 }],
-          totalTimeSpentDays: 9
-        },
-        2: {
-          entries: [{ startDate: '2023-11-11', completionDate: '2023-11-20', timeSpentDays: 9 }],
-          totalTimeSpentDays: 9
-        },
-        3: {
-          entries: [{ startDate: '2023-11-21', completionDate: '2023-12-05', timeSpentDays: 14 }],
-          totalTimeSpentDays: 14
-        },
-        4: {
-          entries: [{ startDate: '2023-12-06', completionDate: '2023-12-15', timeSpentDays: 9 }],
-          totalTimeSpentDays: 9
-        },
-        5: {
-          entries: [{ startDate: '2023-12-16', completionDate: '2023-12-20', timeSpentDays: 4 }],
-          totalTimeSpentDays: 4
-        },
-        6: {
-          entries: [{ startDate: '2023-12-21', completionDate: '2024-01-15', timeSpentDays: 25 }],
-          totalTimeSpentDays: 25
-        },
-        7: {}
-      }
-    },
-    {
-      id: 'sagach5',
-      name: 'סג"ח מלאי',
-      description: 'סג"ח לניהול מלאי ומוצרים',
-      provider: 'מחלקת לוגיסטיקה',
-      lastUpdated: '2023-12-20',
-      arena: 'ניהול משאבים',
-      priority: 'TOP',
-      processStatus: 6,
-      processStartDate: '2023-10-01',
-      estimatedCompletion: '2023-12-31',
-      contactPerson: 'אלי רוזן',
-      notes: 'הושלם וארכיבי',
-      attachments: [],
-      notifications: false,
-      statusUpdates: [],
-      notificationSubscribers: [],
-      phaseData: {
-        1: {
-          entries: [{ startDate: '2023-10-01', completionDate: '2023-10-08', timeSpentDays: 7 }],
-          totalTimeSpentDays: 7
-        },
-        2: {
-          entries: [{ startDate: '2023-10-09', completionDate: '2023-10-18', timeSpentDays: 9 }],
-          totalTimeSpentDays: 9
-        },
-        3: {
-          entries: [{ startDate: '2023-10-19', completionDate: '2023-11-15', timeSpentDays: 27 }],
-          totalTimeSpentDays: 27
-        },
-        4: {
-          entries: [{ startDate: '2023-11-16', completionDate: '2023-11-25', timeSpentDays: 9 }],
-          totalTimeSpentDays: 9
-        },
-        5: {
-          entries: [{ startDate: '2023-11-26', completionDate: '2023-12-05', timeSpentDays: 9 }],
-          totalTimeSpentDays: 9
-        },
-        6: {
-          entries: [{ startDate: '2023-12-06', completionDate: '2023-12-20', timeSpentDays: 14 }],
-          totalTimeSpentDays: 14
-        },
-        7: {}
-      }
-    },
-    {
-      id: 'sagach6',
-      name: 'סג"ח משאבי אנוש',
-      description: 'סג"ח לניהול עובדים ומשכורות',
-      provider: 'מחלקת משאבי אנוש',
-      lastUpdated: '2024-01-14',
-      arena: 'כספים ותקציב',
-      priority: 'גבוה',
-      processStatus: 3,
-      processStartDate: '2023-12-15',
-      estimatedCompletion: '2024-02-28',
-      contactPerson: 'רונית גולן',
-      notes: 'בתהליך אפיון מתקדם',
-      attachments: [],
-      notifications: true,
-      statusUpdates: [],
-      phaseData: {
-        1: {
-          entries: [{ startDate: '2023-12-15', completionDate: '2023-12-22', timeSpentDays: 7 }],
-          totalTimeSpentDays: 7
-        },
-        2: {
-          entries: [{ startDate: '2023-12-23', completionDate: '2024-01-05', timeSpentDays: 13 }],
-          totalTimeSpentDays: 13
-        },
-        3: {
-          currentEntry: { startDate: '2024-01-06', timeSpentDays: 0 },
-          totalTimeSpentDays: 0
-        },
-        4: {}, 5: {}, 6: {}, 7: {}
-      }
-    }
-  ]
+  // No sample data - returns empty array
+const getDefaultSagachim = (): SagachimStatusItem[] => []
   
   // Data is now managed by the centralized context
 
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [selectedProvider, setSelectedProvider] = useState<string>('')
-  const [selectedArena, setSelectedArena] = useState<string>('')
+  const [selectedArena, setSelectedArena] = useState<ArenaOption | ''>('')
   const [selectedProcessStatus, setSelectedProcessStatus] = useState<string>('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none')
   const [selectedSagach, setSelectedSagach] = useState<SagachimStatusItem | null>(null)
@@ -479,6 +249,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
   const [isStatusEditDropdownOpen, setIsStatusEditDropdownOpen] = useState<boolean>(false)
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState<boolean>(false)
   const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState<boolean>(false)
+  const [isEditArenaDropdownOpen, setIsEditArenaDropdownOpen] = useState<boolean>(false)
+  const [isNewArenaDropdownOpen, setIsNewArenaDropdownOpen] = useState<boolean>(false)
   
   // Notification settings popup
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState<boolean>(false)
@@ -496,7 +268,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
     name: '',
     description: '',
     provider: '',
-    arena: '',
+    arena: [] as ArenaOption[],
     priority: 'בינוני' as PriorityOption,
     sagachType: ''
   })
@@ -525,7 +297,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
   const [editValues, setEditValues] = useState({
     description: '',
     provider: '',
-    arena: '',
+    arena: [] as ArenaOption[],
     priority: 'בינוני' as PriorityOption,
     sagachType: '',
     processStatus: 1,
@@ -724,13 +496,22 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
 
   // Close dropdowns when clicking outside
   useEffect(() => {
-    const handleClickOutside = () => {
-      setIsProviderDropdownOpen(false)
-      setIsArenaDropdownOpen(false)
-      setIsProcessStatusDropdownOpen(false)
-      setIsStatusEditDropdownOpen(false)
-      setIsSortDropdownOpen(false)
-    setIsPriorityDropdownOpen(false)
+    const handleClickOutside = (event: Event) => {
+      const target = event.target as HTMLElement
+      
+      // Check if click is outside any dropdown
+      const clickedInsideDropdown = target.closest('[data-dropdown-container]')
+      
+      if (!clickedInsideDropdown) {
+        setIsProviderDropdownOpen(false)
+        setIsArenaDropdownOpen(false)
+        setIsProcessStatusDropdownOpen(false)
+        setIsStatusEditDropdownOpen(false)
+        setIsSortDropdownOpen(false)
+        setIsPriorityDropdownOpen(false)
+        setIsEditArenaDropdownOpen(false)
+        setIsNewArenaDropdownOpen(false)
+      }
     }
 
     document.addEventListener('click', handleClickOutside)
@@ -795,7 +576,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
   }, [sagachimStatus])
 
   const arenas = useMemo(() => {
-    const uniqueArenas = [...new Set(sagachimStatus.map(s => s.arena))]
+    const allArenas = sagachimStatus.flatMap(s => s.arena)
+    const uniqueArenas = [...new Set(allArenas)]
     return uniqueArenas.sort()
   }, [sagachimStatus])
 
@@ -820,7 +602,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         sagach.description.toLowerCase().includes(searchQuery.toLowerCase())
       
       const matchesProvider = !selectedProvider || sagach.provider === selectedProvider
-      const matchesArena = !selectedArena || sagach.arena === selectedArena
+      const matchesArena = !selectedArena || sagach.arena.includes(selectedArena)
       const matchesProcessStatus = !selectedProcessStatus || sagach.processStatus.toString() === selectedProcessStatus
       
       return matchesSearch && matchesProvider && matchesArena && matchesProcessStatus
@@ -1128,7 +910,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
     setEditValues({
       description: selectedSagach.description,
       provider: selectedSagach.provider,
-      arena: selectedSagach.arena,
+      arena: [...selectedSagach.arena],
       priority: selectedSagach.priority,
       sagachType: selectedSagach.sagachType || '',
       processStatus: selectedSagach.processStatus,
@@ -1165,7 +947,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
           ...selectedSagach,
           description: editValues.description.trim(),
           provider: editValues.provider.trim(),
-          arena: editValues.arena.trim(),
+          arena: editValues.arena,
           priority: editValues.priority,
           sagachType: editValues.sagachType.trim() || undefined,
           attachments: editValues.attachments,
@@ -1175,7 +957,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         const updates: any = {
           description: editValues.description.trim(),
           provider: editValues.provider.trim(),
-          arena: editValues.arena.trim(),
+          arena: editValues.arena,
           priority: editValues.priority,
           attachments: editValues.attachments,
           lastUpdated: formatDateWithSlashes(getCurrentDate())
@@ -1299,7 +1081,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         ...selectedSagach,
         description: editValues.description.trim(),
         provider: editValues.provider.trim(),
-        arena: editValues.arena.trim(),
+        arena: editValues.arena,
         priority: editValues.priority,
         sagachType: editValues.sagachType.trim() || undefined,
         attachments: editValues.attachments,
@@ -1333,7 +1115,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
     setEditValues({
       description: '',
       provider: '',
-      arena: '',
+      arena: [] as ArenaOption[],
       priority: 'בינוני' as PriorityOption,
       sagachType: '',
       processStatus: 1,
@@ -1374,7 +1156,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
 
     // Validation
     if (!newSagachForm.name.trim() || !newSagachForm.description.trim() || 
-        !newSagachForm.provider.trim() || !newSagachForm.arena.trim() || !newSagachForm.priority) {
+        !newSagachForm.provider.trim() || newSagachForm.arena.length === 0 || !newSagachForm.priority) {
       alert('יש למלא את כל השדות הדרושים')
       return
     }
@@ -1395,7 +1177,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         description: newSagachForm.description.trim(),
         provider: newSagachForm.provider.trim(),
         lastUpdated: formatDateWithSlashes(getCurrentDate()),
-        arena: newSagachForm.arena.trim(),
+        arena: newSagachForm.arena,
         priority: newSagachForm.priority,
         sagachType: newSagachForm.sagachType.trim() || undefined,
         attachments: [],
@@ -1407,7 +1189,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         notifications: false,
         statusUpdates: [{
           id: Date.now().toString(),
-          message: `נוצר סג"ח חדש: "${newSagachForm.name.trim()}" • ספק: ${newSagachForm.provider.trim()} • זירה: ${newSagachForm.arena.trim()}${newSagachForm.sagachType.trim() ? ` • סוג: ${newSagachForm.sagachType.trim()}` : ''}`,
+          message: `נוצר סג"ח חדש: "${newSagachForm.name.trim()}" • ספק: ${newSagachForm.provider.trim()} • זירות: ${newSagachForm.arena.join(', ')}${newSagachForm.sagachType.trim() ? ` • סוג: ${newSagachForm.sagachType.trim()}` : ''}`,
           timestamp: formatDate(getCurrentDate().toISOString()),
           type: 'system' as const,
           processStatus: 1,
@@ -1427,7 +1209,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
       addSagachimStatus(newSagach);
       
       // Reset form and close popup
-      setNewSagachForm({ name: '', description: '', provider: '', arena: '', priority: 'בינוני' as PriorityOption, sagachType: '' })
+      setNewSagachForm({ name: '', description: '', provider: '', arena: [] as ArenaOption[], priority: 'בינוני' as PriorityOption, sagachType: '' })
       setIsNewSagachPopupOpen(false)
       
       // Open the new sagach for editing
@@ -1824,7 +1606,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         </div>
 
         {/* Provider Filter */}
-        <div style={{ position: 'relative', minWidth: '160px', maxWidth: '220px', flex: '0 1 180px' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ position: 'relative', minWidth: '160px', maxWidth: '220px', flex: '0 1 180px' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
           <button
             onClick={() => setIsProviderDropdownOpen(!isProviderDropdownOpen)}
             style={buttonStyles.filter}
@@ -1910,7 +1692,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         </div>
 
         {/* Arena Filter */}
-        <div style={{ position: 'relative', minWidth: '160px', maxWidth: '220px', flex: '0 1 180px' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ position: 'relative', minWidth: '160px', maxWidth: '220px', flex: '0 1 180px' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
           <button
             onClick={() => setIsArenaDropdownOpen(!isArenaDropdownOpen)}
             style={buttonStyles.filter}
@@ -2005,7 +1787,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         </div>
 
         {/* Process Status Filter */}
-        <div style={{ position: 'relative', minWidth: '180px', maxWidth: '240px', flex: '0 1 200px' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ position: 'relative', minWidth: '180px', maxWidth: '240px', flex: '0 1 200px' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
           <button
             onClick={() => setIsProcessStatusDropdownOpen(!isProcessStatusDropdownOpen)}
             style={buttonStyles.filter}
@@ -2098,7 +1880,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
           </div>
 
           {/* Sort Dropdown */}
-          <div style={{ position: 'relative', minWidth: '160px', maxWidth: '220px', flex: '0 1 180px' }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ position: 'relative', minWidth: '160px', maxWidth: '220px', flex: '0 1 180px' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
             <button
               onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
               style={buttonStyles.filter}
@@ -2584,7 +2366,13 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                 color: 'var(--muted)',
                 margin: '0 0 16px 0',
                 lineHeight: '1.5',
-                minHeight: '42px'
+                minHeight: '42px',
+                whiteSpace: 'pre-wrap',
+                direction: 'rtl',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden'
               }}>
                 {sagach.description}
               </p>
@@ -2820,7 +2608,13 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                                 color: 'var(--muted)',
                                 margin: '0 0 16px 0',
                                 lineHeight: '1.5',
-                                minHeight: '42px'
+                                minHeight: '42px',
+                                whiteSpace: 'pre-wrap',
+                                direction: 'rtl',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden'
                               }}>
                                 {sagach.description}
                               </p>
@@ -3020,7 +2814,13 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                         color: 'var(--muted)',
                         margin: '0 0 16px 0',
                         lineHeight: '1.5',
-                        minHeight: '42px'
+                        minHeight: '42px',
+                        whiteSpace: 'pre-wrap',
+                        direction: 'rtl',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
                       }}>
                         {sagach.description}
                       </p>
@@ -3544,7 +3344,9 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                       color: 'var(--text)', 
                       fontSize: '16px', 
                       margin: 0, 
-                      lineHeight: '1.6' 
+                      lineHeight: '1.6',
+                      whiteSpace: 'pre-wrap',
+                      direction: 'rtl'
                     }}>
                       {selectedSagach.description}
                     </p>
@@ -3612,33 +3414,97 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                     זירה
                   </h4>
                   {isEditingDetails ? (
-                    <input
-                      type="text"
-                      value={editValues.arena}
-                      onChange={(e) => setEditValues(prev => ({ ...prev, arena: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '12px 16px',
-                        background: 'rgba(255,255,255,0.08)',
-                        border: '1px solid rgba(255,255,255,0.2)',
-                        borderRadius: '12px',
-                        color: 'var(--text)',
-                        fontSize: '18px',
-                        fontFamily: 'Segoe UI, sans-serif',
-                        outline: 'none',
-                        transition: 'all 0.2s ease',
-                        direction: 'rtl',
-                        boxSizing: 'border-box'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = 'rgba(124,192,255,0.6)'
-                        e.target.style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = 'rgba(255,255,255,0.2)'
-                        e.target.style.boxShadow = 'none'
-                      }}
-                    />
+                    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditArenaDropdownOpen(prev => !prev)}
+                        style={{
+                          appearance: 'none',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          background: 'rgba(255,255,255,0.08)',
+                          borderRadius: '12px',
+                          color: '#ffffff',
+                          padding: '12px 16px',
+                          cursor: 'pointer',
+                          fontSize: '16px',
+                          direction: 'rtl',
+                          outline: 'none',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          width: '100%',
+                          fontFamily: 'Segoe UI, sans-serif'
+                        }}
+                      >
+                        <span style={{ textAlign: 'right', flex: 1 }}>
+                          {editValues.arena.length === 0 
+                            ? 'בחר זירות...' 
+                            : editValues.arena.join(', ')
+                          }
+                        </span>
+                        <span style={{ marginLeft: '8px', fontSize: '12px' }}>▼</span>
+                      </button>
+
+                      {isEditArenaDropdownOpen && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 4px)',
+                          right: 0,
+                          left: 0,
+                          background: 'var(--panel)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '12px',
+                          zIndex: 1000,
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                          backdropFilter: 'blur(8px)',
+                          overflow: 'hidden',
+                          maxHeight: '200px',
+                          overflowY: 'auto'
+                        }}>
+                          {ARENA_OPTIONS.map(option => (
+                            <div
+                              key={`edit-arena-${option}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const isSelected = editValues.arena.includes(option)
+                                setEditValues(prev => ({
+                                  ...prev,
+                                  arena: isSelected
+                                    ? prev.arena.filter(a => a !== option)
+                                    : [...prev.arena, option]
+                                }))
+                              }}
+                              style={{
+                                padding: '10px 16px',
+                                cursor: 'pointer',
+                                transition: 'background 0.2s ease',
+                                direction: 'rtl',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: editValues.arena.includes(option) ? 'rgba(124,192,255,0.15)' : 'transparent',
+                                color: 'var(--text)'
+                              }}
+                              onMouseEnter={(e) => {
+                                (e.currentTarget as HTMLDivElement).style.background = 'rgba(124,192,255,0.15)'
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!editValues.arena.includes(option)) {
+                                  (e.currentTarget as HTMLDivElement).style.background = 'transparent'
+                                }
+                              }}
+                            >
+                              <span>{option}</span>
+                              {editValues.arena.includes(option) && (
+                                <span style={{ color: 'var(--accent)', fontSize: '12px' }}>✓</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <p style={{ 
                       color: 'var(--text)', 
@@ -3646,7 +3512,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                       margin: 0,
                       lineHeight: '1.8' 
                     }}>
-                      {selectedSagach.arena}
+                      {selectedSagach.arena.join(', ')}
                     </p>
                   )}
                 </div>
@@ -3662,7 +3528,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                     תעדוף
                   </h4>
                   {isEditingDetails ? (
-                    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
                       <button
                         type="button"
                         onClick={() => setIsPriorityDropdownOpen(prev => !prev)}
@@ -3812,7 +3678,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                     שלב בתהליך
                   </h4>
                   {isEditingDetails ? (
-                    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
                       <button
                         type="button"
                         onClick={() => setIsProcessStatusDropdownOpen(prev => !prev)}
@@ -5180,7 +5046,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
       }} onClick={() => {
         if (!isCreateSagachLoading) {
           setIsNewSagachPopupOpen(false)
-          setNewSagachForm({ name: '', description: '', provider: '', arena: '', priority: 'בינוני' as PriorityOption, sagachType: '' })
+          setNewSagachForm({ name: '', description: '', provider: '', arena: [] as ArenaOption[], priority: 'בינוני' as PriorityOption, sagachType: '' })
         }
       }}>
         <div style={{
@@ -5437,45 +5303,108 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                 }}>
                   זירה *
                 </label>
-                <input
-                  type="text"
-                  value={newSagachForm.arena}
-                  onChange={(e) => setNewSagachForm(prev => ({ ...prev, arena: e.target.value }))}
-                  placeholder="שם הזירה..."
-                  disabled={isCreateSagachLoading}
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    background: 'rgba(255,255,255,0.08)',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '12px',
-                    color: 'var(--text)',
-                    fontSize: '14px',
-                    fontFamily: 'Segoe UI, sans-serif',
-                    outline: 'none',
-                    transition: 'all 0.2s ease',
-                    direction: 'rtl',
-                    opacity: isCreateSagachLoading ? 0.6 : 1,
-                    cursor: isCreateSagachLoading ? 'not-allowed' : 'text',
-                    boxSizing: 'border-box'
-                  }}
-                  onFocus={(e) => {
-                    if (!isCreateSagachLoading) {
-                      e.target.style.borderColor = 'rgba(124,192,255,0.6)'
-                      e.target.style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
-                    }
-                  }}
-                  onBlur={(e) => {
-                    if (!isCreateSagachLoading) {
-                      e.target.style.borderColor = 'rgba(255,255,255,0.2)'
-                      e.target.style.boxShadow = 'none'
-                    }
-                  }}
-                />
+                <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
+                  <button
+                    type="button"
+                    disabled={isCreateSagachLoading}
+                    onClick={() => setIsNewArenaDropdownOpen(prev => !prev)}
+                    style={{
+                      appearance: 'none',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      background: 'rgba(255,255,255,0.08)',
+                      borderRadius: '12px',
+                      color: isCreateSagachLoading ? 'rgba(255,255,255,0.5)' : '#ffffff',
+                      padding: '12px 16px',
+                      cursor: isCreateSagachLoading ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      direction: 'rtl',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                      fontFamily: 'Segoe UI, sans-serif',
+                      opacity: isCreateSagachLoading ? 0.6 : 1,
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span style={{ textAlign: 'right', flex: 1 }}>
+                      {newSagachForm.arena.length === 0 
+                        ? 'בחר זירות...' 
+                        : newSagachForm.arena.join(', ')
+                      }
+                    </span>
+                    <span style={{ marginLeft: '8px', fontSize: '12px' }}>▼</span>
+                  </button>
+
+                  {isNewArenaDropdownOpen && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      right: 0,
+                      left: 0,
+                      background: 'var(--panel)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '12px',
+                      zIndex: 1000,
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                      backdropFilter: 'blur(8px)',
+                      overflow: 'hidden',
+                      maxHeight: '200px',
+                      overflowY: 'auto'
+                    }}>
+                      {ARENA_OPTIONS.map(option => (
+                        <div
+                          key={`new-arena-${option}`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!isCreateSagachLoading) {
+                              const isSelected = newSagachForm.arena.includes(option)
+                              setNewSagachForm(prev => ({
+                                ...prev,
+                                arena: isSelected
+                                  ? prev.arena.filter(a => a !== option)
+                                  : [...prev.arena, option]
+                              }))
+                            }
+                          }}
+                          style={{
+                            padding: '10px 16px',
+                            cursor: isCreateSagachLoading ? 'not-allowed' : 'pointer',
+                            transition: 'background 0.2s ease',
+                            direction: 'rtl',
+                            fontSize: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: newSagachForm.arena.includes(option) ? 'rgba(124,192,255,0.15)' : 'transparent',
+                            color: isCreateSagachLoading ? 'rgba(255,255,255,0.5)' : 'var(--text)'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isCreateSagachLoading) {
+                              (e.currentTarget as HTMLDivElement).style.background = 'rgba(124,192,255,0.15)'
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isCreateSagachLoading && !newSagachForm.arena.includes(option)) {
+                              (e.currentTarget as HTMLDivElement).style.background = 'transparent'
+                            }
+                          }}
+                        >
+                          <span>{option}</span>
+                          {newSagachForm.arena.includes(option) && (
+                            <span style={{ color: 'var(--accent)', fontSize: '12px' }}>✓</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Priority */}
-              <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
                 <label style={{
                   display: 'block',
                   color: 'var(--text)',
@@ -5621,7 +5550,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
               onClick={() => {
                 if (!isCreateSagachLoading) {
                   setIsNewSagachPopupOpen(false)
-                  setNewSagachForm({ name: '', description: '', provider: '', arena: '', priority: 'בינוני' as PriorityOption, sagachType: '' })
+                  setNewSagachForm({ name: '', description: '', provider: '', arena: [] as ArenaOption[], priority: 'בינוני' as PriorityOption, sagachType: '' })
                 }
               }}
               disabled={isCreateSagachLoading}

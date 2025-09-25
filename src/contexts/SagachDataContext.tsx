@@ -27,13 +27,38 @@ export interface SagachTable {
   lastModifiedAt: string
 }
 
+// Arena options available for selection
+export const ARENA_OPTIONS = [
+  '110',
+  '130', 
+  '150',
+  '160',
+  '180',
+  '190',
+  'על-זירתי'
+] as const
+
+export type ArenaOption = typeof ARENA_OPTIONS[number]
+
+export interface PhaseEntry {
+  startDate: string
+  completionDate?: string
+  timeSpentDays: number
+}
+
+export interface PhaseData {
+  entries?: PhaseEntry[]
+  currentEntry?: PhaseEntry
+  totalTimeSpentDays?: number
+}
+
 export interface SagachimStatusItem {
   id: string
   name: string
   description: string
   provider: string
   lastUpdated: string
-  arena: string
+  arena: ArenaOption[]
   priority: 'נמוך' | 'בינוני' | 'גבוה' | 'TOP'
   sagachType?: string // סוג הסג"ח - optional free text field
   processStatus: 1 | 2 | 3 | 4 | 5 | 6 | 7
