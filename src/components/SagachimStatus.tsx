@@ -10,6 +10,15 @@ const formatDateWithSlashes = (date: Date): string => {
   return `${day}/${month}/${year}`
 }
 
+// Format file size in human readable format
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
+
 interface PhaseEntry {
   startDate: string
   completionDate?: string
@@ -43,6 +52,16 @@ const PRIORITY_LABELS: Record<PriorityOption, string> = {
   'TOP': 'TOP'
 }
 
+interface FileAttachment {
+  id: string
+  name: string
+  size: number
+  type: string
+  uploadDate: string
+  url?: string // For downloaded files or file references
+  data?: string // Base64 data for small files or file content
+}
+
 interface SagachimStatusItem {
   id: string
   name: string
@@ -66,6 +85,7 @@ interface SagachimStatusItem {
   notificationFrequency?: 'daily' | 'weekly' | 'status_change' // Notification frequency
   completionDate?: string // Date when status was set to "מובצע" (7)
   notificationSubscribers?: NotificationSubscriber[] // List of users subscribed to notifications for this sagach
+  attachments?: FileAttachment[] // Relevant files attached to this sagach
 }
 
 interface NotificationSubscriber {
@@ -232,6 +252,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
       estimatedCompletion: '2024-02-15',
       contactPerson: 'יוסי כהן',
       notes: 'חזר לשלב אפיון - צפוי להסתיים בזמן',
+      attachments: [],
       notifications: false,
       statusUpdates: [],
       notificationSubscribers: [],
@@ -275,6 +296,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
       estimatedCompletion: '2024-03-01',
       contactPerson: 'שרה לוי',
       notes: 'ממתינים לאישור נוסף מהספק',
+      attachments: [],
       notifications: false,
       statusUpdates: [],
       notificationSubscribers: [],
@@ -326,6 +348,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
       estimatedCompletion: '2024-01-15',
       contactPerson: 'מיכל דוד',
       notes: 'הושלם בהצלחה!',
+      attachments: [],
       notifications: false,
       statusUpdates: [],
       notificationSubscribers: [],
@@ -370,6 +393,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
       estimatedCompletion: '2023-12-31',
       contactPerson: 'אלי רוזן',
       notes: 'הושלם וארכיבי',
+      attachments: [],
       notifications: false,
       statusUpdates: [],
       notificationSubscribers: [],
@@ -414,6 +438,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
       estimatedCompletion: '2024-02-28',
       contactPerson: 'רונית גולן',
       notes: 'בתהליך אפיון מתקדם',
+      attachments: [],
       notifications: true,
       statusUpdates: [],
       phaseData: {
@@ -503,7 +528,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
     arena: '',
     priority: 'בינוני' as PriorityOption,
     sagachType: '',
-    processStatus: 1
+    processStatus: 1,
+    attachments: [] as FileAttachment[]
   })
 
   // Force re-render when date changes
@@ -1105,7 +1131,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
       arena: selectedSagach.arena,
       priority: selectedSagach.priority,
       sagachType: selectedSagach.sagachType || '',
-      processStatus: selectedSagach.processStatus
+      processStatus: selectedSagach.processStatus,
+      attachments: selectedSagach.attachments || []
     })
     setIsEditingDetails(true)
   }
@@ -1141,6 +1168,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
           arena: editValues.arena.trim(),
           priority: editValues.priority,
           sagachType: editValues.sagachType.trim() || undefined,
+          attachments: editValues.attachments,
           lastUpdated: formatDateWithSlashes(getCurrentDate())
         }
 
@@ -1149,6 +1177,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
           provider: editValues.provider.trim(),
           arena: editValues.arena.trim(),
           priority: editValues.priority,
+          attachments: editValues.attachments,
           lastUpdated: formatDateWithSlashes(getCurrentDate())
         }
         
@@ -1273,6 +1302,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         arena: editValues.arena.trim(),
         priority: editValues.priority,
         sagachType: editValues.sagachType.trim() || undefined,
+        attachments: editValues.attachments,
         processStatus: newProcessStatus,
         statusUpdates: [...(selectedSagach.statusUpdates || []), statusUpdate],
         lastUpdated: formatDateWithSlashes(currentDate),
@@ -1306,7 +1336,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
       arena: '',
       priority: 'בינוני' as PriorityOption,
       sagachType: '',
-      processStatus: 1
+      processStatus: 1,
+      attachments: []
     })
   }
 
@@ -1367,6 +1398,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
         arena: newSagachForm.arena.trim(),
         priority: newSagachForm.priority,
         sagachType: newSagachForm.sagachType.trim() || undefined,
+        attachments: [],
         processStatus: 1,
         processStartDate: getCurrentDate().toISOString().split('T')[0],
         estimatedCompletion: '-', // Default value
@@ -4111,6 +4143,242 @@ const getDefaultSagachim = (): SagachimStatusItem[] => [
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* 7. קבצים רלוונטים */}
+                <div>
+                  <h4 style={{ 
+                    color: 'rgba(124,192,255,0.9)', 
+                    fontSize: '18px', 
+                    fontWeight: '600', 
+                    margin: '0 0 8px 0' 
+                  }}>
+                    קבצים רלוונטים
+                  </h4>
+                  
+                  {isEditingDetails ? (
+                    <div style={{
+                      border: '2px dashed rgba(124,192,255,0.3)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      textAlign: 'center',
+                      background: 'rgba(255,255,255,0.02)',
+                      marginBottom: '16px'
+                    }}>
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || [])
+                          const maxFileSize = 10 * 1024 * 1024 // 10MB in bytes
+                          
+                          files.forEach(file => {
+                            // Check file size limit
+                            if (file.size > maxFileSize) {
+                              showPopupIndicator(
+                                `הקובץ "${file.name}" גדול מדי (${formatFileSize(file.size)}). מקסימום: 10MB`,
+                                'warning'
+                              )
+                              return
+                            }
+                            
+                            const reader = new FileReader()
+                            reader.onload = (event) => {
+                              const newFile: FileAttachment = {
+                                id: Date.now().toString() + Math.random().toString(36),
+                                name: file.name,
+                                size: file.size,
+                                type: file.type || 'application/octet-stream',
+                                uploadDate: new Date().toISOString(),
+                                data: event.target?.result as string
+                              }
+                              setEditValues(prev => ({
+                                ...prev,
+                                attachments: [...prev.attachments, newFile]
+                              }))
+                              showPopupIndicator(`הקובץ "${file.name}" הועלה בהצלחה`, 'success')
+                            }
+                            reader.readAsDataURL(file)
+                          })
+                          // Clear the input
+                          e.target.value = ''
+                        }}
+                        style={{
+                          display: 'none'
+                        }}
+                        id="file-upload-input"
+                      />
+                      <label 
+                        htmlFor="file-upload-input" 
+                        style={{
+                          cursor: 'pointer',
+                          display: 'block'
+                        }}
+                      >
+                        <div style={{
+                          fontSize: '48px',
+                          marginBottom: '12px',
+                          color: 'rgba(124,192,255,0.6)'
+                        }}>
+                          📁
+                        </div>
+                        <div style={{
+                          fontSize: '16px',
+                          color: 'rgba(124,192,255,0.8)',
+                          marginBottom: '8px'
+                        }}>
+                          לחץ כאן או גרור קבצים להעלאה
+                        </div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: 'var(--muted)',
+                          opacity: 0.7
+                        }}>
+                          תומך בכל סוגי הקבצים • מקסימום 10MB לקובץ
+                        </div>
+                      </label>
+                    </div>
+                  ) : null}
+
+                  {/* Files list */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    {(isEditingDetails ? editValues.attachments : selectedSagach.attachments || []).map((file, index) => (
+                      <div key={file.id} style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '8px',
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
+                        e.currentTarget.style.borderColor = 'rgba(124,192,255,0.3)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
+                      }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          flex: 1
+                        }}>
+                          <div style={{
+                            fontSize: '20px'
+                          }}>
+                            {file.type.startsWith('image/') ? '🖼️' :
+                             file.type.startsWith('video/') ? '🎥' :
+                             file.type.startsWith('audio/') ? '🎵' :
+                             file.type === 'application/pdf' ? '📄' :
+                             file.type.includes('word') ? '📝' :
+                             file.type.includes('excel') || file.type.includes('spreadsheet') ? '📊' :
+                             file.type.includes('powerpoint') || file.type.includes('presentation') ? '📈' :
+                             '📎'}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{
+                              fontSize: '14px',
+                              color: 'var(--text)',
+                              fontWeight: '500',
+                              marginBottom: '2px'
+                            }}>
+                              {file.name}
+                            </div>
+                            <div style={{
+                              fontSize: '11px',
+                              color: 'var(--muted)',
+                              opacity: 0.7
+                            }}>
+                              {formatFileSize(file.size)} • {formatDateWithSlashes(new Date(file.uploadDate))}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          gap: '8px'
+                        }}>
+                          <button
+                            onClick={() => {
+                              // Download file
+                              const link = document.createElement('a')
+                              link.href = file.data || file.url || ''
+                              link.download = file.name
+                              link.click()
+                            }}
+                            style={{
+                              background: 'rgba(76,175,80,0.2)',
+                              border: '1px solid rgba(76,175,80,0.3)',
+                              borderRadius: '6px',
+                              padding: '6px 10px',
+                              color: 'rgba(76,175,80,1)',
+                              fontSize: '16px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(76,175,80,0.3)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(76,175,80,0.2)'
+                            }}
+                            title="הורד קובץ"
+                          >
+                            ⬇️
+                          </button>
+                          {isEditingDetails && (
+                            <button
+                              onClick={() => {
+                                setEditValues(prev => ({
+                                  ...prev,
+                                  attachments: prev.attachments.filter(f => f.id !== file.id)
+                                }))
+                              }}
+                              style={{
+                                background: 'rgba(244,67,54,0.2)',
+                                border: '1px solid rgba(244,67,54,0.3)',
+                                borderRadius: '6px',
+                                padding: '6px 10px',
+                                color: 'rgba(244,67,54,1)',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(244,67,54,0.3)'
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'rgba(244,67,54,0.2)'
+                              }}
+                              title="מחק קובץ"
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {(isEditingDetails ? editValues.attachments : selectedSagach.attachments || []).length === 0 && (
+                      <div style={{
+                        textAlign: 'center',
+                        color: 'var(--muted)',
+                        fontSize: '14px',
+                        padding: '20px',
+                        opacity: 0.6
+                      }}>
+                        {isEditingDetails ? 'לא הועלו קבצים עדיין' : 'אין קבצים רלוונטים'}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
