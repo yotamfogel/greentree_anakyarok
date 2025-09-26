@@ -9,10 +9,12 @@
     "preview": "vite preview --open"
   },
   "dependencies": {
+    "@azure/msal-browser": "^4.24.0",
+    "@azure/msal-react": "^3.0.20",
+    "exceljs": "^4.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "xlsx": "^0.18.5",
-    "exceljs": "^4.4.0"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",
@@ -22,4 +24,3 @@
     "vite": "^5.1.0"
   }
 }
-

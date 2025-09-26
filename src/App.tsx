@@ -11,6 +11,7 @@ import { SagachDataProvider } from './contexts/SagachDataContext'
 import { LoginModal } from './components/LoginModal'
 import { UserStatus } from './components/UserStatus'
 import { PermissionManager } from './components/PermissionManager'
+import { LocalAuthTest } from './components/LocalAuthTest'
 import { usePermissions } from './contexts/PermissionContext'
 import ErrorBoundary from './components/ErrorBoundary'
 
@@ -2268,6 +2269,11 @@ function AppContent() {
         isOpen={showPermissionManager} 
         onClose={() => setShowPermissionManager(false)} 
       />
+
+      {/* Local Auth Test Component - Only show in development or when needed */}
+      {process.env.NODE_ENV === 'development' && (
+        <LocalAuthTest />
+      )}
     </div>
   )
 }

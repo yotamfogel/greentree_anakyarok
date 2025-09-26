@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { usePermissions, UserRole, getRoleDisplayName } from '../contexts/PermissionContext'
+import { getAuthMode, getAuthModeDisplayName, canSwitchAuthMode, setAuthMode } from '../config/authConfig'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -7,7 +8,7 @@ interface LoginModalProps {
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
-  const { login, isLoading } = usePermissions()
+  const { login, loginWithAdfs, isLoading, authMode, canSwitchAuthMode: canSwitch } = usePermissions()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -51,6 +52,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
   }
 
+  const handleAdfsLogin = async () => {
+    try {
+      await loginWithAdfs()
+      onClose()
+    } catch (error) {
+      console.error('ADFS login failed:', error)
+    }
+  }
+
+  const handleAuthModeSwitch = () => {
+    const newMode = authMode === 'local' ? 'adfs' : 'local'
+    setAuthMode(newMode)
+  }
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
@@ -90,15 +105,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           alignItems: 'center',
           marginBottom: '24px'
         }}>
-          <h2 style={{
-            margin: 0,
-            color: 'var(--text)',
-            fontSize: '24px',
-            fontWeight: '600',
-            direction: 'rtl'
-          }}>
-            התחברות למערכת
-          </h2>
+          <div style={{ direction: 'rtl' }}>
+            <h2 style={{
+              margin: 0,
+              color: 'var(--text)',
+              fontSize: '24px',
+              fontWeight: '600'
+            }}>
+              התחברות למערכת
+            </h2>
+            <div style={{
+              fontSize: '14px',
+              color: 'var(--muted)',
+              marginTop: '4px'
+            }}>
+              מצב אימות: {getAuthModeDisplayName(authMode)}
+            </div>
+          </div>
           <button
             onClick={onClose}
             style={{
@@ -118,7 +141,119 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ direction: 'rtl' }}>
+        {/* Authentication Mode Switcher */}
+        {canSwitch && (
+          <div style={{
+            marginBottom: '20px',
+            textAlign: 'center',
+            direction: 'rtl'
+          }}>
+            <button
+              type="button"
+              onClick={handleAuthModeSwitch}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: '1px solid var(--accent)',
+                backgroundColor: 'transparent',
+                color: 'var(--accent)',
+                fontSize: '12px',
+                fontFamily: 'Segoe UI, Arial, sans-serif',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--accent)'
+                e.currentTarget.style.color = 'white'
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+                e.currentTarget.style.color = 'var(--accent)'
+              }}
+            >
+              עבור ל{authMode === 'local' ? 'אימות ADFS' : 'אימות מקומי'}
+            </button>
+          </div>
+        )}
+
+        {/* ADFS Authentication */}
+        {authMode === 'adfs' && (
+          <div style={{ direction: 'rtl', textAlign: 'center', marginBottom: '20px' }}>
+            <button
+              type="button"
+              onClick={handleAdfsLogin}
+              disabled={isLoading}
+              style={{
+                width: '100%',
+                padding: '16px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: isLoading ? 'var(--muted)' : '#0078d4',
+                color: 'white',
+                fontSize: '16px',
+                fontFamily: 'Segoe UI, Arial, sans-serif',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.2s',
+                fontWeight: '600'
+              }}
+            >
+              {isLoading ? 'מתחבר...' : 'התחבר עם ADFS'}
+            </button>
+            <div style={{
+              fontSize: '12px',
+              color: 'var(--muted)',
+              marginTop: '8px'
+            }}>
+              תועבר לדף ההתחברות של ADFS
+            </div>
+            
+            {/* Local Login Option in ADFS Mode */}
+            <div style={{
+              marginTop: '16px',
+              padding: '12px',
+              backgroundColor: 'rgba(124, 192, 255, 0.1)',
+              borderRadius: '8px',
+              border: '1px solid rgba(124, 192, 255, 0.2)'
+            }}>
+              <div style={{
+                fontSize: '12px',
+                color: 'var(--muted)',
+                marginBottom: '8px'
+              }}>
+                או התחבר עם חשבון מקומי:
+              </div>
+              <button
+                type="button"
+                onClick={handleAuthModeSwitch}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--accent)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--accent)',
+                  fontSize: '12px',
+                  fontFamily: 'Segoe UI, Arial, sans-serif',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--accent)'
+                  e.currentTarget.style.color = 'white'
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                  e.currentTarget.style.color = 'var(--accent)'
+                }}
+              >
+                עבור לאימות מקומי
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Local Authentication Form */}
+        {authMode === 'local' && (
+          <form onSubmit={handleSubmit} style={{ direction: 'rtl' }}>
           <div style={{ marginBottom: '20px' }}>
             <label style={{
               display: 'block',
@@ -308,7 +443,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               {isLoading ? 'מתחבר...' : 'התחבר'}
             </button>
           </div>
-        </form>
+          </form>
+        )}
 
         <div style={{
           marginTop: '20px',
@@ -318,28 +454,60 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           border: '1px solid rgba(124, 192, 255, 0.2)',
           direction: 'rtl'
         }}>
-          <h4 style={{
-            margin: '0 0 8px 0',
-            color: 'var(--text)',
-            fontSize: '14px',
-            fontWeight: '600'
-          }}>
-            הסבר על הרשאות:
-          </h4>
-          <div style={{
-            fontSize: '12px',
-            color: 'var(--muted)',
-            lineHeight: '1.4'
-          }}>
-            <div><strong>צופה:</strong> צפייה בלבד בסג"חים</div>
-            <div><strong>עורך:</strong> הוספת הודעות בצ'אט</div>
-            <div><strong>מנהל:</strong> עריכת סטטוסים, יצירת סג"חים, הודעות וניהול משתמשים</div>
-            <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(124, 192, 255, 0.3)' }}>
-              <div style={{ color: 'var(--accent)', fontWeight: '600' }}>חשבון מנהל לדמו:</div>
-              <div>שם משתמש: <strong>admin</strong></div>
-              <div>סיסמה: <strong>admin</strong></div>
-            </div>
-          </div>
+          {authMode === 'local' ? (
+            <>
+              <h4 style={{
+                margin: '0 0 8px 0',
+                color: 'var(--text)',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                הסבר על הרשאות:
+              </h4>
+              <div style={{
+                fontSize: '12px',
+                color: 'var(--muted)',
+                lineHeight: '1.4'
+              }}>
+                <div><strong>צופה:</strong> צפייה בלבד בסג"חים</div>
+                <div><strong>עורך:</strong> הוספת הודעות בצ'אט</div>
+                <div><strong>מנהל:</strong> עריכת סטטוסים, יצירת סג"חים, הודעות וניהול משתמשים</div>
+                <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(124, 192, 255, 0.3)' }}>
+                  <div style={{ color: 'var(--accent)', fontWeight: '600' }}>חשבון מנהל לדמו:</div>
+                  <div>שם משתמש: <strong>admin</strong></div>
+                  <div>סיסמה: <strong>admin</strong></div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <h4 style={{
+                margin: '0 0 8px 0',
+                color: 'var(--text)',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                אימות ADFS:
+              </h4>
+              <div style={{
+                fontSize: '12px',
+                color: 'var(--muted)',
+                lineHeight: '1.4'
+              }}>
+                <div>ההרשאות נקבעות אוטומטית על פי חברות בקבוצות Active Directory:</div>
+                <div><strong>מנהלים:</strong> admin, admins, Administrators</div>
+                <div><strong>עורכים:</strong> editor, editors, Writers</div>
+                <div><strong>צופים:</strong> כל המשתמשים האחרים</div>
+                {canSwitch && (
+                  <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(124, 192, 255, 0.3)' }}>
+                    <div style={{ color: 'var(--accent)', fontWeight: '600' }}>
+                      ניתן לעבור בין מצבי אימות בלחיצה על הכפתור למעלה
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

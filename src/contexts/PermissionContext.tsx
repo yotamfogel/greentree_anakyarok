@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { getAuthMode, AuthMode } from '../config/authConfig'
+import { adfsLogin, adfsLogout, getCurrentAdfsUser, initializeAdfs } from '../services/adfsAuthService'
 
 // User roles with different permission levels
 export type UserRole = 'viewer' | 'editor' | 'admin'
@@ -26,11 +28,14 @@ interface User {
   email: string
   role: UserRole
   lastLogin?: string
+  authMode?: AuthMode
+  adfsAccount?: any // MSAL AccountInfo when using ADFS
 }
 
 interface PermissionContextType {
   user: User | null
   login: (userData: Partial<User>) => Promise<void>
+  loginWithAdfs: () => Promise<void>
   logout: () => void
   hasPermission: (permission: Permission) => boolean
   hasRole: (role: UserRole) => boolean
@@ -40,6 +45,8 @@ interface PermissionContextType {
   canChat: () => boolean
   canManageUsers: () => boolean
   isLoading: boolean
+  authMode: AuthMode
+  canSwitchAuthMode: boolean
 }
 
 const PermissionContext = createContext<PermissionContextType | undefined>(undefined)
@@ -51,26 +58,40 @@ interface PermissionProviderProps {
 export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [authMode] = useState<AuthMode>(() => getAuthMode())
 
-  // Load user from localStorage on mount
+  // Load user from localStorage or ADFS on mount
   useEffect(() => {
-    const loadUser = () => {
+    const initializeAuth = async () => {
+      setIsLoading(true)
       try {
+        if (authMode === 'adfs') {
+          // Try to restore ADFS user session
+          const adfsUser = await initializeAdfs()
+          if (adfsUser) {
+            setUser(adfsUser)
+            return
+          }
+        }
+        
+        // Fallback to local storage for local auth or when ADFS fails
         const savedUser = localStorage.getItem('user')
         if (savedUser) {
           const userData = JSON.parse(savedUser) as User
+          // Ensure authMode is set correctly
+          userData.authMode = authMode
           setUser(userData)
         }
       } catch (error) {
-        console.error('Failed to load user from localStorage:', error)
+        console.error('Failed to initialize authentication:', error)
         localStorage.removeItem('user')
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadUser()
-  }, [])
+    initializeAuth()
+  }, [authMode])
 
   // Save user to localStorage whenever user changes
   useEffect(() => {
@@ -88,16 +109,17 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
   const login = async (userData: Partial<User>) => {
     setIsLoading(true)
     try {
-      // Simulate API call
+      // Simulate API call for local authentication
       await new Promise(resolve => setTimeout(resolve, 500))
       
-      // For demo purposes, create a user with the provided data
+      // For local authentication, create a user with the provided data
       const newUser: User = {
         id: userData.id || `user_${Date.now()}`,
         name: userData.name || 'משתמש',
         email: userData.email || 'user@example.com',
         role: userData.role || 'viewer',
-        lastLogin: new Date().toISOString()
+        lastLogin: new Date().toISOString(),
+        authMode: 'local'
       }
       
       setUser(newUser)
@@ -127,10 +149,10 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
         } 
       }))
     } catch (error) {
-      console.error('Login failed:', error)
+      console.error('Local login failed:', error)
       window.dispatchEvent(new CustomEvent('excel:status', { 
         detail: { 
-          message: 'שגיאה בהתחברות', 
+          message: 'שגיאה בהתחברות מקומית', 
           type: 'error', 
           durationMs: 3000 
         } 
@@ -140,15 +162,67 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     }
   }
 
-  const logout = () => {
-    setUser(null)
-    window.dispatchEvent(new CustomEvent('excel:status', { 
-      detail: { 
-        message: 'התנתקת בהצלחה', 
-        type: 'ok', 
-        durationMs: 2000 
-      } 
-    }))
+  const loginWithAdfs = async () => {
+    setIsLoading(true)
+    try {
+      const result = await adfsLogin()
+      const adfsUser = await getCurrentAdfsUser()
+      
+      if (adfsUser) {
+        setUser(adfsUser)
+        
+        // Show success message
+        window.dispatchEvent(new CustomEvent('excel:status', { 
+          detail: { 
+            message: `ברוך הבא, ${adfsUser.name}!`, 
+            type: 'ok', 
+            durationMs: 3000 
+          } 
+        }))
+      } else {
+        throw new Error('Failed to get user information from ADFS')
+      }
+    } catch (error) {
+      console.error('ADFS login failed:', error)
+      window.dispatchEvent(new CustomEvent('excel:status', { 
+        detail: { 
+          message: 'שגיאה בהתחברות ADFS', 
+          type: 'error', 
+          durationMs: 3000 
+        } 
+      }))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const logout = async () => {
+    try {
+      // Handle ADFS logout if user is authenticated via ADFS
+      if (user?.authMode === 'adfs') {
+        await adfsLogout()
+      }
+      
+      setUser(null)
+      window.dispatchEvent(new CustomEvent('excel:status', { 
+        detail: { 
+          message: 'התנתקת בהצלחה', 
+          type: 'ok', 
+          durationMs: 2000 
+        } 
+      }))
+    } catch (error) {
+      console.error('Logout failed:', error)
+      // Still clear local user state even if ADFS logout fails
+      setUser(null)
+      window.dispatchEvent(new CustomEvent('excel:status', { 
+        detail: { 
+          message: 'התנתקת (עם שגיאות)', 
+          type: 'warn', 
+          durationMs: 3000 
+        } 
+      }))
+    }
   }
 
   const hasPermission = (permission: Permission): boolean => {
@@ -183,6 +257,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
   const value: PermissionContextType = {
     user,
     login,
+    loginWithAdfs,
     logout,
     hasPermission,
     hasRole,
@@ -191,7 +266,9 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     canDeleteSagach,
     canChat,
     canManageUsers,
-    isLoading
+    isLoading,
+    authMode,
+    canSwitchAuthMode: !!(import.meta.env.VITE_ADFS_CLIENT_ID && import.meta.env.VITE_ADFS_AUTHORITY)
   }
 
   return (

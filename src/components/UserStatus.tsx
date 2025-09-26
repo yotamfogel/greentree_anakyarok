@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
 import { usePermissions, getRoleDisplayName } from '../contexts/PermissionContext'
+import { getAuthModeDisplayName } from '../config/authConfig'
 
 export const UserStatus: React.FC = () => {
-  const { user, logout, canManageUsers } = usePermissions()
+  const { user, logout, canManageUsers, authMode } = usePermissions()
   const [showDropdown, setShowDropdown] = useState(false)
 
   if (!user) {
@@ -116,6 +117,13 @@ export const UserStatus: React.FC = () => {
               fontWeight: '500'
             }}>
               {getRoleDisplayName(user.role)}
+            </div>
+            <div style={{
+              fontSize: '10px',
+              color: 'var(--muted)',
+              marginTop: '2px'
+            }}>
+              {getAuthModeDisplayName(authMode)}
             </div>
           </div>
 
