@@ -1415,6 +1415,33 @@ function AppContent() {
         <header className="app-header floating">
           <div className="brand">
             <img src="./images/logo.png" alt="העץ הירוק" style={{ height: '80px', width: '80px', objectFit: 'contain', marginRight: '8px', marginTop: '-12px', marginBottom: '-12px' }} />
+            
+            {/* Archive Button - Only visible on status screen */}
+            {activeScreen === 'status' && (
+              <div className="archive-container" style={{ marginRight: '16px' }}>
+                <button 
+                  className="btn glow-blue"
+                  onClick={() => setActiveScreen('archive')}
+                  style={{
+                    padding: '12px 16px',
+                    maxHeight: '35px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                    direction: 'rtl',
+                    fontFamily: 'Segoe UI, sans-serif'
+                  }}
+                  title="ארכיון סגחים מובצעים"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style={{ marginLeft: '8px' }}>
+                    <path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 9.5l4 4h-2.5V16h-3v-2.5H8l4-4z"/>
+                  </svg>
+                  ארכיון
+                </button>
+              </div>
+            )}
+            
             {activeScreen === 'viz' && user?.role === 'admin' && (
             <div className="excel-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* Upload dropdown */}
@@ -1732,31 +1759,6 @@ function AppContent() {
               </div>
             )}
 
-            {/* Archive Button - Only visible on status screen */}
-            {activeScreen === 'status' && (
-              <div className="archive-container" style={{ marginLeft: '16px' }}>
-                <button 
-                  className="btn glow-blue"
-                  onClick={() => setActiveScreen('archive')}
-                  style={{
-                    padding: '12px 16px',
-                    minHeight: '35px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '14px',
-                    direction: 'rtl',
-                    fontFamily: 'Segoe UI, sans-serif'
-                  }}
-                  title="ארכיון סגחים מובצעים"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style={{ marginLeft: '8px' }}>
-                    <path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 9.5l4 4h-2.5V16h-3v-2.5H8l4-4z"/>
-                  </svg>
-                  ארכיון
-                </button>
-              </div>
-            )}
 
             {/* Navigation hamburger */}
             <div className="action-dropdown" ref={navMenuRef} style={{ position: 'relative' }}>

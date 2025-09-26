@@ -377,18 +377,42 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
   }
 
   return (
-    <main className="app-main" style={{ padding: '20px', direction: 'rtl', fontFamily: 'Segoe UI, sans-serif' }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px',
-        flexWrap: 'wrap',
-        gap: '16px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {onBack && (
+    <main className="app-main" style={{display: 'flex', flexDirection: 'column', direction: 'rtl', fontFamily: 'Segoe UI, sans-serif', height: '100vh', overflow: 'hidden', width: '100%' }}>
+      {/* Custom Scrollbar Styles */}
+      <style>
+        {`
+          .archive-scroll::-webkit-scrollbar {
+            width: 8px;
+          }
+          
+          .archive-scroll::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+          }
+          
+          .archive-scroll::-webkit-scrollbar-thumb {
+            background: rgba(76, 175, 80, 0.6);
+            border-radius: 4px;
+            transition: background 0.3s ease;
+          }
+          
+          .archive-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(76, 175, 80, 0.8);
+          }
+          
+          /* For Firefox */
+          .archive-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(76, 175, 80, 0.6) rgba(255, 255, 255, 0.1);
+          }
+        `}
+      </style>
+
+      {/* Title Section - Above Everything */}
+
+        {/* Back Button */}
+        {onBack && (
+          <div style={{ marginBottom: '26px' }}>
             <button
               onClick={onBack}
               style={{
@@ -418,30 +442,14 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
                 <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
               </svg>
             </button>
-          )}
-          <div>
-            <h1 style={{
-              fontSize: '28px',
-              fontWeight: '700',
-              color: 'var(--text)',
-              margin: '0 0 8px 0',
-              textAlign: 'right'
-            }}>
-              ארכיון סגחים מובצעים
-            </h1>
-            <p style={{
-              fontSize: '16px',
-              color: 'var(--muted)',
-              margin: '0',
-              textAlign: 'right'
-            }}>
-              {completedSagachim.length} סגחים הושלמו בסך הכל
-            </p>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Search and Filters */}
+        {/* Title */}
+        
+
+      {/* Filters Section */}
+      
       <div style={{
         display: 'flex',
         flexDirection: 'column',
@@ -450,6 +458,32 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
         alignItems: 'center',
         width: '100%'
       }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          marginBottom: '32px',
+          alignItems: 'center',
+          width: '100%'
+        }}></div>
+        <span style={{
+          fontSize: '28px',
+          fontWeight: '700',
+          color: 'var(--text)',
+          margin: '0 0 8px 0',
+          textAlign: 'right'
+        }}>ארכיון - סג"חים מובצעים</span>
+        <span style={{
+          fontSize: '16px',
+          color: 'var(--muted)',
+          margin: '0 0 8px 0',
+          textAlign: 'right'}}>עיינו בסטטיסטיקות של תהליכי ההכנסה של סג"חים שמובצעו</span>
+        <span style={{
+          fontSize: '16px',
+          color: 'var(--muted)',
+          margin: '0 0 8px 0',
+          textAlign: 'right'}}>מוצגים {filteredData.length} מתוך {completedSagachim.length} סגחים</span>
+          
         {/* Filter Controls Row */}
         <div style={{
           display: 'flex',
@@ -864,23 +898,28 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
         </div>
       </div>
 
-      {/* Results Count */}
-      <div style={{
-        marginBottom: '20px',
-        textAlign: 'right',
-        color: 'var(--muted)',
-        fontSize: '14px'
-      }}>
-        {filteredData.length} מתוך {completedSagachim.length} סגחים
-      </div>
 
-      {/* Archive List */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: '24px',
-        justifyItems: 'center'
+
+      {/* Grid Section */}
+      <div className="archive-scroll" style={{
+         display: 'flex',
+         flexDirection: 'column',
+         gap: '32px',
+         width: '100%',
+         padding: '0 20px 0 20px',
+         maxHeight: 'calc(100vh - 400px)',
+         overflowY: 'auto',
+         overflowX: 'hidden',
+         direction: 'rtl'
       }}>
+        {/* Archive List */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4,1fr)',
+          gap: '24px',
+          justifyItems: 'center',
+          width: '100%'
+        }}>
         {filteredData.map((item: SagachimStatusItem) => (
           <div
             key={item.id}
@@ -1097,6 +1136,12 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
         ))}
       </div>
 
+      {/* Bottom Spacer to ensure last cards are visible above taskbar */}
+      <div style={{
+        height: '150px',
+        width: '100%'
+      }} />
+
       {/* Empty State */}
       {filteredData.length === 0 && (
         <div style={{
@@ -1135,6 +1180,7 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
           </p>
         </div>
       )}
+      </div>
 
       {/* Analytics Modal */}
       <SagachAnalyticsModal
