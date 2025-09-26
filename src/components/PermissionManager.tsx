@@ -395,3 +395,5 @@ export function PermissionManager({ isOpen, onClose }: PermissionManagerProps) {
     </div>
   )
 }
+
+

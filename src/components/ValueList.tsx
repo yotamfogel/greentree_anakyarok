@@ -339,44 +339,178 @@ export function ValueList({ schemas }: ValueListProps) {
       <section className="value-detail-panel dictionary-box" dir="rtl" style={{
         background: 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06))',
         border: '1px solid rgba(255,255,255,0.12)',
+        overflow: 'auto',
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 20px 60px rgba(0,0,0,0.35)'
       }}>
-        <div className="value-detail-headline">
+        <div 
+          className="value-detail-headline" 
+          style={{ fontSize: '50px !important' }}
+        >
           <div></div>
-          <div className={`value-detail-path ${selected ? 'selected' : ''}`}>{selected ? (() => {
-            const parts = selected.path.split('.')
-            if (parts.length <= 2) return selected.name
-            return `${parts.slice(1, parts.length - 1).join(' -> ')} -> ${selected.name}`
-          })() : ''}</div>
+          <div 
+            className={`value-detail-path ${selected ? 'selected' : ''}`} 
+            style={{ fontSize: '26px !important' }}
+          >
+            {selected ? (() => {
+              const parts = selected.path.split('.')
+              if (parts.length <= 2) return selected.name
+              return `${parts.slice(1, parts.length - 1).join(' -> ')} -> ${selected.name}`
+            })() : ''}
+          </div>
         </div>
-        <div className="value-detail-body">
-          <div className="detail-row"><span className="k">מהות השדה:</span><span className="v">{selected?.description || '-'}</span></div>
-          <div className="detail-row"><span className="k">סוג השדה:</span><span className="v">{selected?.type || '-'}</span></div>
-          <div className="detail-row"><span className="k">האם שדה חובה:</span><span className="v">{selected?.rules?.some(r => r === 'required') ? 'כן' : 'לא'}</span></div>
-          <div className="detail-row"><span className="k">דג"ח/רשימה סגורה:</span><span className="v">{selected?.rules?.find(r => r.startsWith('enum')) ? (() => {
-            const enumRule = selected.rules.find(r => r.startsWith('enum'))
-            if (enumRule) {
-              const enumValues = enumRule.replace('enum: ', '').split(', ')
-              return (
-                <div className="enum-values">
-                  {enumValues.map((value, index) => (
-                    <div key={index} className="enum-value">{value}</div>
-                  ))}
-                </div>
-              )
-            }
-            return '-'
-          })() : '-'}</span></div>
-          <div className="detail-row"><span className="k">חוקים:</span><span className="v">{selected?.rules && selected.rules.length ? selected.rules.join(' | ') : '-'}</span></div>
-          <div className="detail-row"><span className="k">בשימוש במשפחות:</span><span className="v">{selected ? (() => {
-            const schemas = new Set<string>()
-            allFields.forEach(field => {
-              if (field.name === selected.name && field.path.split('.').slice(1, -1).join('.') === selected.path.split('.').slice(1, -1).join('.')) {
-                schemas.add(field.schemaTitle)
-              }
-            })
-            return Array.from(schemas).sort().join(', ') || '-'
-          })() : '-'}</span></div>
+        <div 
+          className="value-detail-body" 
+          style={{ 
+            fontSize: '26px !important' 
+          }}
+        >
+          <div className="detail-row">
+            <span 
+              className="k" 
+              style={{ 
+                fontSize: '50px !important',
+                color: 'var(--muted) !important' 
+              }}
+            >
+              מהות השדה:
+            </span>
+            <span 
+              className="v" 
+              style={{ 
+                fontSize: '26px !important',
+                color: 'var(--text) !important' 
+              }}
+            >
+              {selected?.description || '-'}
+            </span>
+          </div>
+          <div className="detail-row">
+            <span 
+              className="k" 
+              style={{ 
+                fontSize: '26px !important',
+                color: 'var(--muted) !important' 
+              }}
+            >
+              סוג השדה:
+            </span>
+            <span 
+              className="v" 
+              style={{ 
+                fontSize: '26px !important',
+                color: 'var(--text) !important' 
+              }}
+            >
+              {selected?.type || '-'}
+            </span>
+          </div>
+          <div className="detail-row">
+            <span 
+              className="k" 
+              style={{ 
+                fontSize: '26px !important',
+                color: 'var(--muted) !important' 
+              }}
+            >
+              האם שדה חובה:
+            </span>
+            <span 
+              className="v" 
+              style={{ 
+                fontSize: '26px !important',
+                color: 'var(--text) !important' 
+              }}
+            >
+              {selected?.rules?.some(r => r === 'required') ? 'כן' : 'לא'}
+            </span>
+          </div>
+          <div className="detail-row">
+            <span 
+              className="k" 
+              style={{ 
+                fontSize: '26px !important',
+                color: 'var(--muted) !important' 
+              }}
+            >
+              דג"ח/רשימה סגורה:
+            </span>
+            <span 
+              className="v" 
+              style={{ 
+                fontSize: '26px !important',
+                color: 'var(--text) !important' 
+              }}
+            >
+              {selected?.rules?.find(r => r.startsWith('enum')) ? (() => {
+                const enumRule = selected.rules.find(r => r.startsWith('enum'))
+                if (enumRule) {
+                  const enumValues = enumRule.replace('enum: ', '').split(', ')
+                  return (
+                    <div className="enum-values" style={{ fontSize: '26px !important' }}>
+                      {enumValues.map((value, index) => (
+                        <div 
+                          key={index} 
+                          className="enum-value" 
+                          style={{ fontSize: '26px !important' }}
+                        >
+                          {value}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                }
+                return '-'
+              })() : '-'}
+            </span>
+          </div>
+          <div className="detail-row">
+            <span 
+              className="k" 
+              style={{ 
+                fontSize: '26px !important',
+                color: 'var(--muted) !important' 
+              }}
+            >
+              חוקים:
+            </span>
+            <span 
+              className="v" 
+              style={{ 
+                fontSize: '26px !important',
+                color: 'var(--text) !important' 
+              }}
+            >
+              {selected?.rules && selected.rules.length ? selected.rules.join(' | ') : '-'}
+            </span>
+          </div>
+          <div className="detail-row">
+            <span 
+              className="k" 
+              style={{ 
+                fontSize: '26px !important',
+                color: 'var(--muted) !important' 
+              }}
+            >
+              בשימוש במשפחות:
+            </span>
+            <span 
+              className="v" 
+              style={{ 
+                fontSize: '26px !important',
+                color: 'var(--text) !important' 
+              }}
+            >
+              {selected ? (() => {
+                const schemas = new Set<string>()
+                allFields.forEach(field => {
+                  if (field.name === selected.name && field.path.split('.').slice(1, -1).join('.') === selected.path.split('.').slice(1, -1).join('.')) {
+                    schemas.add(field.schemaTitle)
+                  }
+                })
+                return Array.from(schemas).sort().join(', ') || '-'
+              })() : '-'}
+            </span>
+          </div>
         </div>
 
       </section>

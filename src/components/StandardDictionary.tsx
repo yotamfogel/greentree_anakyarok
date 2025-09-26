@@ -376,27 +376,37 @@ export function StandardDictionary() {
   // Function to extract fields from schema recursively
   const extractFieldsFromSchema = (schema: any, path: string = ''): Array<{id: string, name: string, description: string, path: string}> => {
     const fields: Array<{id: string, name: string, description: string, path: string}> = []
+    const seenFields = new Set<string>()
     
-    if (schema.properties) {
-      Object.entries(schema.properties).forEach(([key, value]: [string, any]) => {
-        const currentPath = path ? `${path}.${key}` : key
-        const fieldName = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
-        
-        if (value.type === 'object' && value.properties) {
-          // Recursively extract nested object fields
-          fields.push(...extractFieldsFromSchema(value, currentPath))
-        } else {
-          // Add leaf field
-          fields.push({
-            id: currentPath,
-            name: fieldName,
-            description: value.description || 'No description available',
-            path: currentPath
-          })
-        }
-      })
+    const processSchema = (currentSchema: any, currentPath: string = '') => {
+      if (currentSchema.properties) {
+        Object.entries(currentSchema.properties).forEach(([key, value]: [string, any]) => {
+          const fullPath = currentPath ? `${currentPath}.${key}` : key
+          const fieldName = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
+          
+          // Create unique identifier for field (combination of path and name)
+          const fieldIdentifier = `${fullPath}|${fieldName}`
+          
+          if (value.type === 'object' && value.properties) {
+            // Recursively extract nested object fields
+            processSchema(value, fullPath)
+          } else {
+            // Add leaf field only if not already seen
+            if (!seenFields.has(fieldIdentifier)) {
+              seenFields.add(fieldIdentifier)
+              fields.push({
+                id: fullPath,
+                name: fieldName,
+                description: value.description || 'No description available',
+                path: fullPath
+              })
+            }
+          }
+        })
+      }
     }
     
+    processSchema(schema, path)
     return fields
   }
 

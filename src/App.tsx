@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect, useRef, type CSSProperties } from 'react'
 import { buildTree, TreeNodeData } from './utils/parser'
 import { TreeView } from './components/TreeView'
 import { DynamicConnectors } from './components/DynamicConnectors'
@@ -151,18 +151,19 @@ type ToastType = 'ok' | 'warn' | 'error'
 
 function AppContent() {
   const { user, isLoading, canManageUsers } = usePermissions()
+
+  // ----- GLOBAL APP STATE / מצב גלובלי המשפיע על כל המסכים -----
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showPermissionManager, setShowPermissionManager] = useState(false)
   const [activeScreen, setActiveScreen] = useState<'viz' | 'dictionary' | 'common' | 'status'>('status')
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [toastType, setToastType] = useState<ToastType>('ok')
+  const [toastLeaving, setToastLeaving] = useState<boolean>(false)
+  const [toastShown, setToastShown] = useState<boolean>(false)
+  const toastHideTimerRef = useRef<number | null>(null)
+  const toastRemoveTimerRef = useRef<number | null>(null)
 
-  // Redirect non-admin users away from restricted screens
-  useEffect(() => {
-    if (user && user.role !== 'admin') {
-      if (activeScreen === 'viz' || activeScreen === 'dictionary' || activeScreen === 'common') {
-        setActiveScreen('status')
-      }
-    }
-  }, [user, activeScreen])
+  // ----- VIZ SCREEN STATE / מצבי מסך "ויזואליזציה" -----
   const [rawInput, setRawInput] = useState<string>(sampleJson)
   const [tree, setTree] = useState<TreeNodeData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -181,9 +182,6 @@ function AppContent() {
   const [leftText, setLeftText] = useState<string>('')
   const [isSpecificOutputs, setIsSpecificOutputs] = useState<boolean>(false)
   const [outputsText, setOutputsText] = useState<string>('')
-  const [showExcelHeaderActions, setShowExcelHeaderActions] = useState<boolean>(false)
-  const [requiredPanelOpen, setRequiredPanelOpen] = useState<boolean>(true)
-  const [showMissingRequiredModal, setShowMissingRequiredModal] = useState<boolean>(false)
   const [savedMappings, setSavedMappings] = useState<Array<{
     targetNode: TreeNodeData
     field: any
@@ -193,24 +191,20 @@ function AppContent() {
   }>>([])
   const [selectedSchema, setSelectedSchema] = useState<string>('')
   const [isSchemaDropdownOpen, setIsSchemaDropdownOpen] = useState<boolean>(false)
+  const [showExcelHeaderActions, setShowExcelHeaderActions] = useState<boolean>(false)
+  const [requiredPanelOpen, setRequiredPanelOpen] = useState<boolean>(true)
+  const [showMissingRequiredModal, setShowMissingRequiredModal] = useState<boolean>(false)
   const [isUploadMenuOpen, setIsUploadMenuOpen] = useState<boolean>(false)
   const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState<boolean>(false)
   const [isNavOpen, setIsNavOpen] = useState<boolean>(false)
-  // Toast state
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const [toastType, setToastType] = useState<ToastType>('ok')
-  const [toastLeaving, setToastLeaving] = useState<boolean>(false)
-  const [toastShown, setToastShown] = useState<boolean>(false)
-  const toastHideTimerRef = useRef<number | null>(null)
-  const toastRemoveTimerRef = useRef<number | null>(null)
-  // Duplicate target mapping confirmation
+  // Duplicate target mapping confirmation (viz)
   const [showDuplicateMappingModal, setShowDuplicateMappingModal] = useState<boolean>(false)
   const [pendingMapping, setPendingMapping] = useState<any | null>(null)
   const [pendingDropData, setPendingDropData] = useState<MappingData | null>(null)
   const [duplicateContext, setDuplicateContext] = useState<'drop' | 'save' | null>(null)
 
+  // ----- VIZ SCREEN REFS / רפרנסים למסך הוויזואליזציה -----
   const vizWrapperRef = useRef<HTMLDivElement>(null)
-  // Keep latest zoom/pan for global wheel handler during drag
   const zoomRef = useRef<number>(1)
   const panRef = useRef<{x:number;y:number}>({ x: 0, y: 0 })
   const inputDropdownRef = useRef<HTMLDivElement>(null)
@@ -220,6 +214,16 @@ function AppContent() {
   const navMenuRef = useRef<HTMLDivElement>(null)
   const lastImportedMappingsRef = useRef<any[] | null>(null)
   const savedMappingsRef = useRef<typeof savedMappings>([])
+
+  // ----- DICTIONARY SCREEN STATE / מצבי מסך "מילון" -----
+  // ----- CROSS-SCREEN NAVIGATION EFFECTS / שמירה על מגבלות גישה למסכים -----
+  useEffect(() => {
+    if (user && user.role !== 'admin') {
+      if (activeScreen === 'viz' || activeScreen === 'dictionary' || activeScreen === 'common') {
+        setActiveScreen('status')
+      }
+    }
+  }, [user, activeScreen])
 
   const parsedPreview = useMemo(() => {
     try {
@@ -1309,6 +1313,46 @@ function AppContent() {
   const onMouseUp: React.MouseEventHandler<HTMLDivElement> = () => setIsPanning(false)
   const onMouseLeave: React.MouseEventHandler<HTMLDivElement> = () => setIsPanning(false)
 
+  const setSagachTriggerHover = (target: HTMLButtonElement, hover: boolean) => {
+    target.style.transform = hover ? 'translateY(-1px)' : 'translateY(0px)'
+    target.style.boxShadow = hover ? '0 6px 20px rgba(0,0,0,0.35)' : 'none'
+  }
+
+  const setSagachOptionHover = (target: HTMLDivElement, hover: boolean, active: boolean) => {
+    if (!target.dataset.baseBg) {
+      target.dataset.baseBg = target.style.background || ''
+    }
+
+    if (target.classList.contains('opt-orange')) {
+      if (hover) {
+        target.style.background = 'rgba(228, 184, 27, 0.55)'
+        return
+      }
+
+      if (active) {
+        target.style.background = 'rgba(228, 184, 27, 0.55)'
+        return
+      }
+    }
+    else if (target.classList.contains('opt-green')) {
+      if (hover) {
+        target.style.background = 'rgba(38, 216, 56, 0.55)'
+        return
+      }
+
+      if (active) {
+        target.style.background = 'rgba(38, 216, 56, 0.55)'
+        return
+      }
+    }
+    const baseBg = target.dataset.baseBg
+    if (typeof baseBg === 'string') {
+      target.style.background = baseBg
+    } else {
+      target.style.removeProperty('background')
+    }
+  }
+
   // Excel status toast listener
   useEffect(() => {
     const clearToastTimers = () => {
@@ -1376,25 +1420,75 @@ function AppContent() {
               <div className="action-dropdown" ref={uploadMenuRef} style={{ position: 'relative', width: 240 }}>
                 <button 
                   className="btn glow-orange"
-                  style={{ width: '100%', padding: '12px 14px', minHeight: '48px' }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    minHeight: '35px',
+                    maxHeight: '35px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                    direction: 'rtl'
+                  }}
                   onClick={() => { setIsUploadMenuOpen(!isUploadMenuOpen); setIsDownloadMenuOpen(false) }}
+                  onMouseEnter={(e) => setSagachTriggerHover(e.currentTarget, true)}
+                  onMouseLeave={(e) => setSagachTriggerHover(e.currentTarget, false)}
                 >
-                  העלאה <span style={{ marginLeft: 6 }}>▼</span>
+                  <span style={{ marginLeft: 5,marginTop: '2px', fontSize: '10px' }}>▲</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>העלאה</span>
+                  </span>
                 </button>
                 {isUploadMenuOpen && (
-                  <div className="schema-dropdown" style={{ right: 0, left: 'auto', width: '100%', minWidth: '100%' }}>
+                  <div
+                    className="schema-dropdown"
+                    style={{
+                      right: 0,
+                      left: 'auto',
+                      width: '100%',
+                      minWidth: '100%',
+                      border: '1px solid rgba(201, 168, 25, 0.17)',
+                      borderRadius: '12px',
+                      marginTop: '4px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      background: 'rgba(182, 130, 32, 0.93)',
+                      boxShadow: '0 18px 44px rgba(0,0,0,0.7)',
+                      backdropFilter: 'blur(48px)',
+                      overflow: 'hidden'
+                    }}
+                  >
                     <div 
                       className="schema-option opt-orange"
                       onClick={() => { window.dispatchEvent(new Event('excel:upload-mapping-request')); setIsUploadMenuOpen(false) }}
                       dir="rtl"
+                      style={{
+                        padding: '10px 12px',
+                        borderBottom: '1px solid rgba(255,255,255,0.08)',
+                        textAlign: 'center',
+                        background: 'rgba(10,24,45,0.98)',
+                        color: '#ffffff'
+                      }}
+                      onMouseEnter={(e) => setSagachOptionHover(e.currentTarget, true, false)}
+                      onMouseLeave={(e) => setSagachOptionHover(e.currentTarget, false, false)}
                     >
                       העלה Mapping
                     </div>
                     <div 
                       className="schema-option opt-orange"
                       onClick={() => { window.dispatchEvent(new Event('excel:upload-request')); setIsUploadMenuOpen(false) }}
+                      style={{
+                        padding: '10px 12px',
+                        borderBottom: 'none',
+                        textAlign: 'center',
+                        background: 'rgba(10,24,45,0.98)',
+                        color: '#ffffff'
+                      }}
+                      onMouseEnter={(e) => setSagachOptionHover(e.currentTarget, true, false)}
+                      onMouseLeave={(e) => setSagachOptionHover(e.currentTarget, false, false)}
                     >
-                      העלה פס
+                      העלה קובץ דג"ח
                     </div>
                   </div>
                 )}
@@ -1404,13 +1498,45 @@ function AppContent() {
               <div className="action-dropdown" ref={downloadMenuRef} style={{ position: 'relative', width: 240 }}>
                 <button 
                   className="btn glow-green"
-                  style={{ width: '100%', padding: '12px 14px', minHeight: '48px' }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    minHeight: '35px',
+                    maxHeight: '35px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                    direction: 'rtl'
+                  }}
                   onClick={() => { setIsDownloadMenuOpen(!isDownloadMenuOpen); setIsUploadMenuOpen(false) }}
+                  onMouseEnter={(e) => setSagachTriggerHover(e.currentTarget, true)}
+                  onMouseLeave={(e) => setSagachTriggerHover(e.currentTarget, false)}
                 >
-                  הורדה <span style={{ marginLeft: 6 }}>▼</span>
+                  <span style={{ marginLeft: 5,marginTop: '2px', fontSize: '10px' }}>▼</span>
+                  <span style={{ display: 'flex', alignItems: 'center',textAlign: 'center', justifyContent: 'center', gap: 6 }}>
+                    <span>הורדה</span>
+                  </span>
                 </button>
                 {isDownloadMenuOpen && (
-                  <div className="schema-dropdown" style={{ right: 0, left: 'auto', width: '100%', minWidth: '100%' }}>
+                  <div
+                    className="schema-dropdown"
+                    style={{
+                      right: 0,
+                      left: 'auto',
+                      width: '100%',
+                      minWidth: '100%',
+                      border: '1px solid rgba(39, 228, 22, 0.76)',
+                      borderRadius: '12px',
+                      marginTop: '4px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      background: 'rgba(10,24,45,0.98)',
+                      boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+                      backdropFilter: 'blur(40px)',
+                      overflow: 'hidden'
+                    }}
+                  >
                     <div 
                       className="schema-option opt-green"
                       onClick={() => { 
@@ -1428,14 +1554,32 @@ function AppContent() {
                         setIsDownloadMenuOpen(false)
                       }}
                       dir="rtl"
+                      style={{
+                        padding: '10px 12px',
+                        borderBottom: '1px solid rgba(255,255,255,0.08)',
+                        textAlign: 'center',
+                        background: 'rgba(10,24,45,0.98)',
+                        color: '#ffffff'
+                      }}
+                      onMouseEnter={(e) => setSagachOptionHover(e.currentTarget, true, false)}
+                      onMouseLeave={(e) => setSagachOptionHover(e.currentTarget, false, false)}
                     >
                       הורד Mapping
                     </div>
                     <div 
                       className="schema-option opt-green"
                       onClick={() => { window.dispatchEvent(new Event('excel:download-template-request')); setIsDownloadMenuOpen(false) }}
+                      style={{
+                        padding: '10px 12px',
+                        borderBottom: 'none',
+                        textAlign: 'center',
+                        background: 'rgba(10,24,45,0.98)',
+                        color: '#ffffff'
+                      }}
+                      onMouseEnter={(e) => setSagachOptionHover(e.currentTarget, true, false)}
+                      onMouseLeave={(e) => setSagachOptionHover(e.currentTarget, false, false)}
                     >
-                      הורד פורמט פס
+                      הורד פורמט דג"ח
                     </div>
                   </div>
                 )}
@@ -1459,7 +1603,8 @@ function AppContent() {
                         color: '#ffa500',
                         border: '1px solid rgba(255, 165, 0, 0.4)',
                         borderRadius: '8px',
-                        fontSize: '14px',
+                        fontSize: '12px',
+                        maxHeight: '35px',
                         fontFamily: 'Segoe UI, Arial, sans-serif',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
@@ -1540,8 +1685,8 @@ function AppContent() {
             )}
             {activeScreen === 'viz' && user?.role === 'admin' && (
               <>
-                <button className="btn ghost" onClick={onClear} style={{ padding: '12px 14px', minHeight: '48px' }}>נקה</button>
-                <button className="btn primary" onClick={onVisualize} style={{ padding: '12px 14px', minHeight: '48px' }}>ויזואליזציה</button>
+                <button className="btn ghost" onClick={onClear} style={{ display: 'flex', padding: '12px 14px', maxHeight: '35px', justifyContent: 'center',alignItems: 'center',alignSelf: 'center'}}>נקה</button>
+                <button className="btn primary" onClick={onVisualize} style={{ display: 'flex', padding: '12px 14px', maxHeight: '35px', justifyContent: 'center',alignItems: 'center',alignSelf: 'center'}}>ויזואליזציה</button>
                 <div className="zoom-controls">
                   <div className="zoom-readout">{Math.round(zoom * 100)}%</div>
                 </div>

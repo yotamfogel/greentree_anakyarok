@@ -217,7 +217,7 @@
   .tree-root { margin: 0 auto; }
   .panel.output .placeholder { color: var(--muted); padding: 16px; }
 
-  .btn { appearance: none; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.06); color: var(--text); border-radius: 12px; padding: 8px 14px; cursor: pointer; transition: transform 120ms ease, box-shadow 200ms ease, background 200ms ease; backdrop-filter: blur(6px); }
+  .btn { appearance: none; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.06); color: var(--text); border-radius: 12px; padding: 8px 14px; cursor: pointer; transition: transform 120ms ease, box-shadow 200ms ease, background 200ms ease; box-shadow: inset 0 1px 0 rgba(255,255,255,0.12); }
   .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(124,192,255,0.24); }
   .btn.primary { border-color: rgba(124,192,255,0.6); background: linear-gradient(180deg, rgba(124,192,255,0.22), rgba(124,192,255,0.1)); }
   .btn.ghost { background: rgba(255,255,255,0.04); }
@@ -225,6 +225,9 @@
   /* Center text inside dropdown trigger buttons */
   .action-dropdown .btn { display: inline-flex; align-items: center; justify-content: center; text-align: center; }
   .action-dropdown .btn span { display: inline-block; }
+  
+  /* Force center alignment even with RTL direction */
+  .action-dropdown .btn[dir="rtl"] { text-align: center !important; justify-content: center !important; }
 
   /* Glow variants for dropdown triggers */
   .btn.glow-green { 
@@ -1131,6 +1134,9 @@
     color: #ffffff;
     text-align: center;
   }
+  
+  /* Force center alignment for dropdown options even with RTL direction */
+  .schema-option[dir="rtl"] { text-align: center !important; }
 
   /* Color accents for Upload/Download dropdown rows */
   .schema-option.opt-green { color: #ffffff; }

@@ -23,11 +23,12 @@ export const UserStatus: React.FC = () => {
           alignItems: 'center',
           gap: '8px',
           padding: '8px 14px',
+          maxHeight: '35px',
           backgroundColor: 'var(--panel)',
           border: '1px solid var(--border)',
           borderRadius: '12px',
           color: 'var(--text)',
-          fontSize: '14px',
+          fontSize: '10px',
           fontFamily: 'Segoe UI, Arial, sans-serif',
           cursor: 'pointer',
           transition: 'all 0.2s',
@@ -55,11 +56,11 @@ export const UserStatus: React.FC = () => {
           {user.name.charAt(0).toUpperCase()}
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontWeight: '600', fontSize: '14px' }}>
+          <div style={{ fontWeight: '600', fontSize: '12px' }}>
             {user.name}
           </div>
           <div style={{ 
-            fontSize: '12px', 
+            fontSize: '10px', 
             color: 'var(--muted)',
             marginTop: '2px'
           }}>

@@ -147,3 +147,5 @@ import { ProtectedComponent } from '../contexts/PermissionContext'
 
 המערכת מוכנה לשימוש וניתנת להרחבה בקלות!
 
+
+
