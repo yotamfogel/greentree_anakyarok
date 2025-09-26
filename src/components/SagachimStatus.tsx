@@ -2420,7 +2420,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                     fontSize: '12px',
                     color: 'var(--text)'
                   }}>
-                    {sagach.arena}
+                    {sagach.arena.join(', ')}
                   </span>
                 </div>
               </div>
@@ -2661,7 +2661,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                                     fontSize: '12px',
                                     color: 'var(--text)'
                                   }}>
-                                    {sagach.arena}
+                                    {sagach.arena.join(', ')}
                                   </span>
                                 </div>
                               </div>
@@ -2867,7 +2867,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                             fontSize: '12px',
                             color: 'var(--text)'
                           }}>
-                            {sagach.arena}
+                            {sagach.arena.join(', ')}
                           </span>
                         </div>
 
