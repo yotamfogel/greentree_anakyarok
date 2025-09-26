@@ -6,12 +6,12 @@ import { ExcelExtractor } from './components/ExcelExtractor'
 import { ValueList } from './components/ValueList'
 import { SagachimManager } from './components/SagachimManager'
 import { SagachimStatus } from './components/SagachimStatus'
+import { SagachimArchive } from './components/SagachimArchive'
 import { PermissionProvider } from './contexts/PermissionContext'
 import { SagachDataProvider } from './contexts/SagachDataContext'
 import { LoginModal } from './components/LoginModal'
 import { UserStatus } from './components/UserStatus'
 import { PermissionManager } from './components/PermissionManager'
-import { LocalAuthTest } from './components/LocalAuthTest'
 import { usePermissions } from './contexts/PermissionContext'
 import ErrorBoundary from './components/ErrorBoundary'
 
@@ -156,7 +156,7 @@ function AppContent() {
   // ----- GLOBAL APP STATE / מצב גלובלי המשפיע על כל המסכים -----
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showPermissionManager, setShowPermissionManager] = useState(false)
-  const [activeScreen, setActiveScreen] = useState<'viz' | 'dictionary' | 'common' | 'status'>('status')
+  const [activeScreen, setActiveScreen] = useState<'viz' | 'dictionary' | 'common' | 'status' | 'archive'>('status')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [toastType, setToastType] = useState<ToastType>('ok')
   const [toastLeaving, setToastLeaving] = useState<boolean>(false)
@@ -1732,6 +1732,32 @@ function AppContent() {
               </div>
             )}
 
+            {/* Archive Button - Only visible on status screen */}
+            {activeScreen === 'status' && (
+              <div className="archive-container" style={{ marginLeft: '16px' }}>
+                <button 
+                  className="btn glow-blue"
+                  onClick={() => setActiveScreen('archive')}
+                  style={{
+                    padding: '12px 16px',
+                    minHeight: '35px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                    direction: 'rtl',
+                    fontFamily: 'Segoe UI, sans-serif'
+                  }}
+                  title="ארכיון סגחים מובצעים"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style={{ marginLeft: '8px' }}>
+                    <path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 9.5l4 4h-2.5V16h-3v-2.5H8l4-4z"/>
+                  </svg>
+                  ארכיון
+                </button>
+              </div>
+            )}
+
             {/* Navigation hamburger */}
             <div className="action-dropdown" ref={navMenuRef} style={{ position: 'relative' }}>
               <button
@@ -1963,6 +1989,8 @@ function AppContent() {
           <SagachimManager />
         ) : activeScreen === 'status' ? (
           <SagachimStatus />
+        ) : activeScreen === 'archive' ? (
+          <SagachimArchive onBack={() => setActiveScreen('status')} />
         ) : user && user.role !== 'admin' ? (
           <div style={{
             display: 'flex',
@@ -2270,10 +2298,6 @@ function AppContent() {
         onClose={() => setShowPermissionManager(false)} 
       />
 
-      {/* Local Auth Test Component - Only show in development or when needed */}
-      {process.env.NODE_ENV === 'development' && (
-        <LocalAuthTest />
-      )}
     </div>
   )
 }

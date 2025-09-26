@@ -392,8 +392,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
 
           return {
             ...sagach,
-            phaseData: currentPhaseData,
-            lastUpdated: formatDateWithSlashes(currentDate)
+            phaseData: currentPhaseData
           }
         })
 
@@ -2907,7 +2906,16 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                             fontSize: '12px',
                             color: 'var(--text)'
                           }}>
-                            {sagach.lastUpdated}
+                            {(() => {
+                              const date = new Date(sagach.lastUpdated)
+                              if (isNaN(date.getTime())) {
+                                return sagach.lastUpdated
+                              }
+                              const day = date.getDate().toString().padStart(2, '0')
+                              const month = (date.getMonth() + 1).toString().padStart(2, '0')
+                              const year = date.getFullYear()
+                              return `${day}.${month}.${year}`
+                            })()}
                           </span>
                         </div>
 
