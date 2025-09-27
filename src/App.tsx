@@ -7,12 +7,15 @@ import { ValueList } from './components/ValueList'
 import { SagachimManager } from './components/SagachimManager'
 import { SagachimStatus } from './components/SagachimStatus'
 import { SagachimArchive } from './components/SagachimArchive'
+import { SagachimAnalytics } from './components/SagachimAnalytics'
+import { ArchiveAnalyticsModal } from './components/ArchiveAnalyticsModal'
 import { PermissionProvider } from './contexts/PermissionContext'
 import { SagachDataProvider } from './contexts/SagachDataContext'
 import { LoginModal } from './components/LoginModal'
 import { UserStatus } from './components/UserStatus'
 import { PermissionManager } from './components/PermissionManager'
 import { usePermissions } from './contexts/PermissionContext'
+import { useSagachData } from './contexts/SagachDataContext'
 import ErrorBoundary from './components/ErrorBoundary'
 
 
@@ -152,11 +155,13 @@ type ToastType = 'ok' | 'warn' | 'error'
 
 function AppContent() {
   const { user, isLoading, canManageUsers } = usePermissions()
+  const { sagachimStatus } = useSagachData()
 
   // ----- GLOBAL APP STATE / מצב גלובלי המשפיע על כל המסכים -----
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showPermissionManager, setShowPermissionManager] = useState(false)
-  const [activeScreen, setActiveScreen] = useState<'viz' | 'dictionary' | 'common' | 'status' | 'archive'>('status')
+  const [showArchiveAnalytics, setShowArchiveAnalytics] = useState(false)
+  const [activeScreen, setActiveScreen] = useState<'viz' | 'dictionary' | 'common' | 'status' | 'archive' | 'analytics'>('status')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [toastType, setToastType] = useState<ToastType>('ok')
   const [toastLeaving, setToastLeaving] = useState<boolean>(false)
@@ -1416,9 +1421,61 @@ function AppContent() {
           <div className="brand">
             <img src="./images/logo.png" alt="העץ הירוק" style={{ height: '80px', width: '80px', objectFit: 'contain', marginRight: '8px', marginTop: '-12px', marginBottom: '-12px' }} />
             
-            {/* Archive Button - Only visible on status screen */}
+            {/* Archive Back Button - Only visible on archive screen */}
+            {activeScreen === 'archive' && (
+              <div className="archive-back" style={{ marginRight: '16px' }}>
+                <button 
+                  className="btn glow-blue"
+                  onClick={() => setActiveScreen('status')}
+                  style={{
+                    padding: '12px 16px',
+                    maxHeight: '35px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                    direction: 'rtl',
+                    fontFamily: 'Segoe UI, sans-serif'
+                  }}
+                  title="חזור לסטטוס סגחים"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style={{ marginLeft: '8px' }}>
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+                  </svg>
+                  חזרה
+                </button>
+              </div>
+            )}
+
+            {/* Analytics Back Button - Only visible on analytics screen */}
+            {activeScreen === 'analytics' && (
+              <div className="analytics-back" style={{ marginRight: '16px' }}>
+                <button 
+                  className="btn glow-blue"
+                  onClick={() => setActiveScreen('status')}
+                  style={{
+                    padding: '12px 16px',
+                    maxHeight: '35px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                    direction: 'rtl',
+                    fontFamily: 'Segoe UI, sans-serif'
+                  }}
+                  title="חזור לסטטוס סגחים"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style={{ marginLeft: '8px' }}>
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+                  </svg>
+                  חזרה
+                </button>
+              </div>
+            )}
+            
+            {/* Status Screen Buttons */}
             {activeScreen === 'status' && (
-              <div className="archive-container" style={{ marginRight: '16px' }}>
+              <div className="status-controls" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginRight: '16px' }}>
                 <button 
                   className="btn glow-blue"
                   onClick={() => setActiveScreen('archive')}
@@ -1438,6 +1495,26 @@ function AppContent() {
                     <path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 9.5l4 4h-2.5V16h-3v-2.5H8l4-4z"/>
                   </svg>
                   ארכיון
+                </button>
+                <button 
+                  className="btn glow-green"
+                  onClick={() => setActiveScreen('analytics')}
+                  style={{
+                    padding: '12px 16px',
+                    maxHeight: '35px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                    direction: 'rtl',
+                    fontFamily: 'Segoe UI, sans-serif'
+                  }}
+                  title="אנליטיקות סגחים"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style={{ marginLeft: '8px' }}>
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+                  </svg>
+                  אנליטיקות
                 </button>
               </div>
             )}
@@ -1913,6 +1990,7 @@ function AppContent() {
                     סטטוס סג"חים
                     <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
                   </div>
+                  
 
                 </div>
               )}
@@ -1993,6 +2071,8 @@ function AppContent() {
           <SagachimStatus />
         ) : activeScreen === 'archive' ? (
           <SagachimArchive onBack={() => setActiveScreen('status')} />
+        ) : activeScreen === 'analytics' ? (
+          <SagachimAnalytics />
         ) : user && user.role !== 'admin' ? (
           <div style={{
             display: 'flex',
@@ -2298,6 +2378,13 @@ function AppContent() {
       <PermissionManager 
         isOpen={showPermissionManager} 
         onClose={() => setShowPermissionManager(false)} 
+      />
+
+      {/* Archive Analytics Modal */}
+      <ArchiveAnalyticsModal
+        isOpen={showArchiveAnalytics}
+        onClose={() => setShowArchiveAnalytics(false)}
+        sagachim={sagachimStatus || []}
       />
 
     </div>

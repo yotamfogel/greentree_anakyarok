@@ -408,48 +408,234 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
         `}
       </style>
 
-      {/* Title Section - Above Everything */}
+      {/* Title Section */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        marginBottom: '32px',
+        padding: '16px 0',
+        borderBottom: '1px solid rgba(255,255,255,0.1)'
+      }}>
+        <span style={{
+          fontSize: '28px',
+          fontWeight: '700',
+          color: 'var(--text)',
+          margin: '0 0 8px 0',
+          textAlign: 'center'
+        }}>ארכיון - סג"חים מובצעים</span>
+        <span style={{
+          fontSize: '16px',
+          color: 'var(--muted)',
+          margin: '0 0 8px 0',
+          textAlign: 'center'
+        }}>עיינו בסטטיסטיקות של תהליכי ההכנסה של סג"חים שמובצעו</span>
+        <span style={{
+          fontSize: '16px',
+          color: 'var(--muted)',
+          margin: '0 0 16px 0',
+          textAlign: 'center'
+        }}>מוצגים {filteredData.length} מתוך {completedSagachim.length} סגחים</span>
+        
+        {/* Analytics Summary Cards */}
+        {(() => {
+          // Calculate analytics for display
+          const analytics = (() => {
+            if (completedSagachim.length === 0) {
+              return {
+                averageImplementationDays: 0,
+                totalCompleted: 0,
+                topProvider: { name: '-', avgDays: 0 },
+                topArena: { name: '-', avgDays: 0 }
+              }
+            }
 
-        {/* Back Button */}
-        {onBack && (
-          <div style={{ marginBottom: '26px' }}>
-            <button
-              onClick={onBack}
-              style={{
-                padding: '12px',
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.2)',
+            // Calculate average implementation days
+            const totalImplementationDays = completedSagachim.reduce((total, sagach) => {
+              if (sagach.processStartDate && sagach.completionDate) {
+                const start = new Date(sagach.processStartDate)
+                const end = new Date(sagach.completionDate)
+                return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+              }
+              return total
+            }, 0)
+            
+            const averageImplementationDays = completedSagachim.length > 0 
+              ? Math.round((totalImplementationDays / completedSagachim.length) * 10) / 10 
+              : 0
+
+            // Provider breakdown
+            const providerBreakdown: { [key: string]: { count: number, avgDays: number } } = {}
+            completedSagachim.forEach(sagach => {
+              const provider = sagach.provider
+              if (!providerBreakdown[provider]) {
+                providerBreakdown[provider] = { count: 0, avgDays: 0 }
+              }
+              providerBreakdown[provider].count++
+              
+              if (sagach.processStartDate && sagach.completionDate) {
+                const start = new Date(sagach.processStartDate)
+                const end = new Date(sagach.completionDate)
+                const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+                providerBreakdown[provider].avgDays += days
+              }
+            })
+
+            // Calculate average days per provider
+            Object.keys(providerBreakdown).forEach(provider => {
+              if (providerBreakdown[provider].count > 0) {
+                providerBreakdown[provider].avgDays = Math.round((providerBreakdown[provider].avgDays / providerBreakdown[provider].count) * 10) / 10
+              }
+            })
+
+            // Arena breakdown
+            const arenaBreakdown: { [key: string]: { count: number, avgDays: number } } = {}
+            completedSagachim.forEach(sagach => {
+              sagach.arena.forEach(arena => {
+                if (!arenaBreakdown[arena]) {
+                  arenaBreakdown[arena] = { count: 0, avgDays: 0 }
+                }
+                arenaBreakdown[arena].count++
+                
+                if (sagach.processStartDate && sagach.completionDate) {
+                  const start = new Date(sagach.processStartDate)
+                  const end = new Date(sagach.completionDate)
+                  const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+                  arenaBreakdown[arena].avgDays += days
+                }
+              })
+            })
+
+            // Calculate average days per arena
+            Object.keys(arenaBreakdown).forEach(arena => {
+              if (arenaBreakdown[arena].count > 0) {
+                arenaBreakdown[arena].avgDays = Math.round((arenaBreakdown[arena].avgDays / arenaBreakdown[arena].count) * 10) / 10
+              }
+            })
+
+            // Find top provider and arena
+            const topProvider = Object.entries(providerBreakdown)
+              .sort(([,a], [,b]) => b.count - a.count)[0] || ['-', { count: 0, avgDays: 0 }]
+            
+            const topArena = Object.entries(arenaBreakdown)
+              .sort(([,a], [,b]) => b.count - a.count)[0] || ['-', { count: 0, avgDays: 0 }]
+
+            return {
+              averageImplementationDays,
+              totalCompleted: completedSagachim.length,
+              topProvider: { name: topProvider[0], avgDays: topProvider[1].avgDays },
+              topArena: { name: topArena[0], avgDays: topArena[1].avgDays }
+            }
+          })()
+
+          return (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px',
+              width: '100%',
+              maxWidth: '800px',
+              marginTop: '16px'
+            }}>
+              {/* Average Implementation Days */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(76,175,80,0.15), rgba(46,125,50,0.10))',
+                border: '1px solid rgba(76,175,80,0.3)',
                 borderRadius: '12px',
-                color: 'var(--text)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontFamily: 'Segoe UI, sans-serif',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.12)'
-                e.currentTarget.style.borderColor = 'rgba(124,192,255,0.3)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'
-              }}
-              title="חזור לסטטוס סגחים"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-              </svg>
-            </button>
-          </div>
-        )}
+                padding: '16px',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '24px',
+                  fontWeight: '700',
+                  color: '#4CAF50',
+                  marginBottom: '4px'
+                }}>
+                  {analytics.averageImplementationDays}
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--muted)',
+                  marginBottom: '2px'
+                }}>
+                  ממוצע ימים למבצוע
+                </div>
+                <div style={{
+                  fontSize: '10px',
+                  color: 'var(--muted)'
+                }}>
+                  {analytics.totalCompleted} סגחים
+                </div>
+              </div>
 
-        {/* Title */}
+              {/* Top Provider */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(255,152,0,0.15), rgba(245,124,0,0.10))',
+                border: '1px solid rgba(255,152,0,0.3)',
+                borderRadius: '12px',
+                padding: '16px',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '24px',
+                  fontWeight: '700',
+                  color: '#FF9800',
+                  marginBottom: '4px'
+                }}>
+                  {analytics.topProvider.avgDays}
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--muted)',
+                  marginBottom: '2px'
+                }}>
+                  ממוצע ספק מוביל
+                </div>
+                <div style={{
+                  fontSize: '10px',
+                  color: 'var(--muted)'
+                }}>
+                  {analytics.topProvider.name}
+                </div>
+              </div>
+
+              {/* Top Arena */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(156,39,176,0.15), rgba(123,31,162,0.10))',
+                border: '1px solid rgba(156,39,176,0.3)',
+                borderRadius: '12px',
+                padding: '16px',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '24px',
+                  fontWeight: '700',
+                  color: '#9C27B0',
+                  marginBottom: '4px'
+                }}>
+                  {analytics.topArena.avgDays}
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--muted)',
+                  marginBottom: '2px'
+                }}>
+                  ממוצע זירה מובילה
+                </div>
+                <div style={{
+                  fontSize: '10px',
+                  color: 'var(--muted)'
+                }}>
+                  {analytics.topArena.name}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+      </div>
         
 
       {/* Filters Section */}
-      
       <div style={{
         display: 'flex',
         flexDirection: 'column',
@@ -458,31 +644,6 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
         alignItems: 'center',
         width: '100%'
       }}>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          marginBottom: '32px',
-          alignItems: 'center',
-          width: '100%'
-        }}></div>
-        <span style={{
-          fontSize: '28px',
-          fontWeight: '700',
-          color: 'var(--text)',
-          margin: '0 0 8px 0',
-          textAlign: 'right'
-        }}>ארכיון - סג"חים מובצעים</span>
-        <span style={{
-          fontSize: '16px',
-          color: 'var(--muted)',
-          margin: '0 0 8px 0',
-          textAlign: 'right'}}>עיינו בסטטיסטיקות של תהליכי ההכנסה של סג"חים שמובצעו</span>
-        <span style={{
-          fontSize: '16px',
-          color: 'var(--muted)',
-          margin: '0 0 8px 0',
-          textAlign: 'right'}}>מוצגים {filteredData.length} מתוך {completedSagachim.length} סגחים</span>
           
         {/* Filter Controls Row */}
         <div style={{
