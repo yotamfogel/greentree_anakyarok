@@ -95,6 +95,20 @@ const formatDateWithSlashes = (date: Date): string => {
   return `${day}/${month}/${year}`
 }
 
+const formatTimestamp = (timestamp: string): string => {
+  if (!timestamp) return 'תאריך לא זמין'
+  
+  try {
+    const date = new Date(timestamp)
+    if (isNaN(date.getTime())) {
+      return 'תאריך לא זמין'
+    }
+    return formatDateWithSlashes(date)
+  } catch {
+    return 'תאריך לא זמין'
+  }
+}
+
 const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -727,10 +741,7 @@ export const SagachAnalyticsModal = ({ isOpen, onClose, sagach }: SagachAnalytic
                          fontSize: '12px',
                          color: 'var(--muted)'
                        }}>
-                         {(() => {
-                           const date = new Date(update.timestamp)
-                           return formatDateWithSlashes(date)
-                         })()}
+                         {formatTimestamp(update.timestamp)}
                        </div>
                     </div>
                     <div style={{

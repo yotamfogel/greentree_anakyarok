@@ -159,6 +159,9 @@ export const SagachimAnalytics = () => {
     // Get all completed sagachim for overall averages
     const allCompletedSagachim = sagachimStatus.filter(item => item.processStatus === 7)
     
+    // Filter completed sagachim that have phaseData for phase calculations
+    const allCompletedSagachimWithPhaseData = allCompletedSagachim.filter(item => item.phaseData && Object.keys(item.phaseData).length > 0)
+    
     // Filter completed sagachim for current filters
     let completedSagachim = allCompletedSagachim
     
@@ -174,11 +177,14 @@ export const SagachimAnalytics = () => {
       )
     }
     
-    // Calculate overall averages first
+    // Filter completed sagachim with phaseData for filtered calculations
+    const completedSagachimWithPhaseData = completedSagachim.filter(item => item.phaseData && Object.keys(item.phaseData).length > 0)
+    
+    // Calculate overall averages first (only for sagachim with phaseData)
     const overallPhaseTotals: { [key: number]: number } = {}
     const overallPhaseCounts: { [key: number]: number } = {}
     
-    allCompletedSagachim.forEach(sagach => {
+    allCompletedSagachimWithPhaseData.forEach(sagach => {
       if (sagach.phaseData) {
         Object.entries(sagach.phaseData).forEach(([phaseNum, phaseData]) => {
           const phase = parseInt(phaseNum)
@@ -221,7 +227,7 @@ export const SagachimAnalytics = () => {
       ? Math.round((totalOverallImplementationDays / allCompletedSagachim.length) * 10) / 10 
       : 0
     
-     if (completedSagachim.length === 0) {
+     if (completedSagachim.length === 0 || completedSagachimWithPhaseData.length === 0) {
        return {
          averageDaysPerPhase: {},
          averageImplementationDays: 0,
@@ -232,11 +238,11 @@ export const SagachimAnalytics = () => {
        }
      }
 
-    // Calculate filtered averages
+    // Calculate filtered averages (only for sagachim with phaseData)
     const phaseTotals: { [key: number]: number } = {}
     const phaseCounts: { [key: number]: number } = {}
     
-    completedSagachim.forEach(sagach => {
+    completedSagachimWithPhaseData.forEach(sagach => {
       if (sagach.phaseData) {
         Object.entries(sagach.phaseData).forEach(([phaseNum, phaseData]) => {
           const phase = parseInt(phaseNum)
@@ -768,14 +774,16 @@ export const SagachimAnalytics = () => {
                       padding: '8px 0',
                       borderBottom: '1px solid rgba(255,255,255,0.1)'
                     }}>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '4px' }}>
-                          שלב {phase}: {PROCESS_STEPS[parseInt(phase) - 1]}
-                        </div>
-                        <div style={{ fontSize: '14px', color: 'var(--muted)' }}>
-                          ממוצע כולל: {overallAverage} ימים
-                        </div>
-                      </div>
+                       <div style={{ textAlign: 'right' }}>
+                         <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '4px' }}>
+                           שלב {phase}: {PROCESS_STEPS[parseInt(phase) - 1]}
+                         </div>
+                         {(selectedProvider || selectedArena) && (
+                           <div style={{ fontSize: '14px', color: 'var(--muted)' }}>
+                             ממוצע כולל: {overallAverage} ימים
+                           </div>
+                         )}
+                       </div>
                       <div style={{
                         color: comparisonColor,
                         fontWeight: '700',

@@ -340,35 +340,59 @@ export function ValueList({ schemas }: ValueListProps) {
         background: 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06))',
         border: '1px solid rgba(255,255,255,0.12)',
         overflow: 'auto',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 20px 60px rgba(0,0,0,0.35)'
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 20px 60px rgba(0,0,0,0.35)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        textAlign: 'center'
       }}>
         <div 
           className="value-detail-headline" 
-          style={{ fontSize: '50px !important' }}
+          style={{ fontSize: '80px !important', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'flex-start', // This centers vertically at the top
+            textAlign: 'center' 
+          }}// This centers the text horizontally}}
         >
           <div></div>
           <div 
             className={`value-detail-path ${selected ? 'selected' : ''}`} 
-            style={{ fontSize: '26px !important' }}
+            style={{ 
+              fontSize: selected ? '40px !important' : '35px !important',
+              fontWeight: selected ? '700' : '400',
+              color: selected ? 'rgb(19, 124, 223)' : 'var(--muted)',
+              textDecoration: selected ? 'underline' : 'none',
+              borderBottom: 'none',
+              paddingBottom: '0px'
+            }}
           >
             {selected ? (() => {
               const parts = selected.path.split('.')
               if (parts.length <= 2) return selected.name
               return `${parts.slice(1, parts.length - 1).join(' -> ')} -> ${selected.name}`
-            })() : ''}
+            })() : '-'}
           </div>
         </div>
+        <hr style={{ width: '75%', marginBottom: '20px', height: '0px'}} />
         <div 
           className="value-detail-body" 
           style={{ 
-            fontSize: '26px !important' 
+            fontSize: '40px !important' ,
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'flex-start', // This centers vertically at the top
+            textAlign: 'center' 
           }}
         >
           <div className="detail-row">
             <span 
               className="k" 
               style={{ 
-                fontSize: '50px !important',
+                fontSize: '60px !important',
                 color: 'var(--muted) !important' 
               }}
             >
@@ -377,7 +401,7 @@ export function ValueList({ schemas }: ValueListProps) {
             <span 
               className="v" 
               style={{ 
-                fontSize: '26px !important',
+                fontSize: '2px !important',
                 color: 'var(--text) !important' 
               }}
             >
@@ -388,7 +412,6 @@ export function ValueList({ schemas }: ValueListProps) {
             <span 
               className="k" 
               style={{ 
-                fontSize: '26px !important',
                 color: 'var(--muted) !important' 
               }}
             >
@@ -421,7 +444,7 @@ export function ValueList({ schemas }: ValueListProps) {
                 color: 'var(--text) !important' 
               }}
             >
-              {selected?.rules?.some(r => r === 'required') ? 'כן' : 'לא'}
+              {selected?.rules?.some(r => r === 'required') ? 'כן' : '-'}
             </span>
           </div>
           <div className="detail-row">

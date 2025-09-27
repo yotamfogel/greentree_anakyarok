@@ -3,12 +3,11 @@ import { buildTree, TreeNodeData } from './utils/parser'
 import { TreeView } from './components/TreeView'
 import { DynamicConnectors } from './components/DynamicConnectors'
 import { ExcelExtractor } from './components/ExcelExtractor'
-import { ValueList } from './components/ValueList'
 import { SagachimManager } from './components/SagachimManager'
 import { SagachimStatus } from './components/SagachimStatus'
+import { ValueList } from './components/ValueList'
 import { SagachimArchive } from './components/SagachimArchive'
 import { SagachimAnalytics } from './components/SagachimAnalytics'
-import { ArchiveAnalyticsModal } from './components/ArchiveAnalyticsModal'
 import { PermissionProvider } from './contexts/PermissionContext'
 import { SagachDataProvider } from './contexts/SagachDataContext'
 import { LoginModal } from './components/LoginModal'
@@ -1896,7 +1895,6 @@ function AppContent() {
                       }}
                     >
                       ויואליזציה + Mapping
-                      <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
                     </div>
                   )}
                   {user?.role === 'admin' && (
@@ -1927,40 +1925,9 @@ function AppContent() {
                       }}
                     >
                       מילון התקן
-                      <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
                     </div>
                   )}
-                  {user?.role === 'admin' && (
-                    <div
-                      className="schema-option"
-                      role="menuitem"
-                      onClick={() => {
-                        console.log('Clicking common option')
-                        setActiveScreen('common')
-                        setIsNavOpen(false)
-                        setIsUploadMenuOpen(false)
-                        setIsDownloadMenuOpen(false)
-                        setIsSchemaDropdownOpen(false)
-                      }}
-                      onMouseEnter={() => console.log('Hovering over common option')}
-                      onMouseLeave={() => console.log('Leaving common option')}
-                      style={{ 
-                        position: 'relative',
-                        padding: '8px 12px',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid rgba(255,255,255,0.06)',
-                        transition: 'background 0.2s ease',
-                        fontSize: '14px',
-                        color: '#ffffff',
-                        textAlign: 'center',
-                        pointerEvents: 'auto',
-                        zIndex: 9999999
-                      }}
-                    >
-                      המרחב המשותף
-                      <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
-                    </div>
-                  )}
+                  
                   <div
                     className="schema-option"
                     role="menuitem"
@@ -1988,7 +1955,6 @@ function AppContent() {
                     }}
                   >
                     סטטוס סג"חים
-                    <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: 'var(--muted)' }}>→</span>
                   </div>
                   
 
@@ -2380,12 +2346,6 @@ function AppContent() {
         onClose={() => setShowPermissionManager(false)} 
       />
 
-      {/* Archive Analytics Modal */}
-      <ArchiveAnalyticsModal
-        isOpen={showArchiveAnalytics}
-        onClose={() => setShowArchiveAnalytics(false)}
-        sagachim={sagachimStatus || []}
-      />
 
     </div>
   )

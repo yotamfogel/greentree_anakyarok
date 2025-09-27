@@ -1189,7 +1189,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         statusUpdates: [{
           id: Date.now().toString(),
           message: `נוצר סג"ח חדש: "${newSagachForm.name.trim()}" • ספק: ${newSagachForm.provider.trim()} • זירות: ${newSagachForm.arena.join(', ')}${newSagachForm.sagachType.trim() ? ` • סוג: ${newSagachForm.sagachType.trim()}` : ''}`,
-          timestamp: formatDate(getCurrentDate().toISOString()),
+          timestamp: getCurrentDate().toISOString(),
           type: 'system' as const,
           processStatus: 1,
           author: user?.name || 'משתמש'
@@ -4019,7 +4019,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                   )}
                 </div>
 
-                {/* 7. קבצים רלוונטים */}
+                {/* 7. קבצים רלוונטים - רק לאדמינים */}
+                {hasRole('admin') && (
                 <div>
                   <h4 style={{ 
                     color: 'rgba(124,192,255,0.9)', 
@@ -4254,6 +4255,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                     )}
                   </div>
                 </div>
+                )}
               </div>
             </div>
 
@@ -4389,7 +4391,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                                     color: 'var(--accent)',
                                     marginRight: '4px'
                                   }}>
-                                    (כולל חזרה)
+                                   (סה"כ)
                                   </span>
                                 )}
                               </div>
