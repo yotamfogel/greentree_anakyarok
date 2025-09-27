@@ -291,6 +291,10 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   // Date editing states
   const [isEditingDate, setIsEditingDate] = useState<boolean>(false)
   const [editDateValue, setEditDateValue] = useState<string>('')
+  
+  // Start date editing states
+  const [isEditingStartDate, setIsEditingStartDate] = useState<boolean>(false)
+  const [editStartDateValue, setEditStartDateValue] = useState<string>('')
 
   // Details editing states
   const [isEditingDetails, setIsEditingDetails] = useState<boolean>(false)
@@ -301,6 +305,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     priority: 'בינוני' as PriorityOption,
     sagachType: '',
     processStatus: 1,
+    processStartDate: '',
     attachments: [] as FileAttachment[]
   })
 
@@ -308,7 +313,53 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
 
   // Get current date (mock or real)
-  const getCurrentDate = () => mockDate || currentDate
+  const getCurrentDate = () => mockDate || new Date()
+
+  // Date conversion utilities
+  const convertStringToDate = (dateString: string): string | null => {
+    if (!dateString.trim()) return null
+    
+    // Check if it's in DD/MM/YYYY format
+    const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+    const match = dateString.match(dateRegex)
+    
+    if (!match) return null
+    
+    const [, day, month, year] = match
+    const dayNum = parseInt(day, 10)
+    const monthNum = parseInt(month, 10)
+    const yearNum = parseInt(year, 10)
+    
+    // Validate date
+    if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12 || yearNum < 1900) {
+      return null
+    }
+    
+    // Create date object and validate it's a real date
+    const date = new Date(yearNum, monthNum - 1, dayNum)
+    if (date.getFullYear() !== yearNum || date.getMonth() !== monthNum - 1 || date.getDate() !== dayNum) {
+      return null
+    }
+    
+    return date.toISOString()
+  }
+
+  const formatDateForDisplay = (dateString: string): string => {
+    if (!dateString) return 'לא צוין'
+    
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return 'לא צוין'
+      
+      const day = date.getDate().toString().padStart(2, '0')
+      const month = (date.getMonth() + 1).toString().padStart(2, '0')
+      const year = date.getFullYear()
+      
+      return `${day}/${month}/${year}`
+    } catch (error) {
+      return 'לא צוין'
+    }
+  }
 
   // Update current date when mock date changes
   useEffect(() => {
@@ -876,17 +927,25 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
       return
     }
     
-    const currentDate = selectedSagach.estimatedCompletion || ''
+    const currentDate = selectedSagach.estimatedCompletion ? formatDateForDisplay(selectedSagach.estimatedCompletion) : ''
     setEditDateValue(currentDate)
     setIsEditingDate(true)
   }
 
   const handleSaveDate = () => {
-    if (!selectedSagach || !editDateValue.trim()) return
+    if (!selectedSagach) return
+    
+    // Convert string to datetime
+    const convertedDate = convertStringToDate(editDateValue)
+    
+    if (editDateValue.trim() && !convertedDate) {
+      showPopupIndicator('פורמט תאריך לא תקין. השתמש בפורמט DD/MM/YYYY', 'warning')
+      return
+    }
     
     const updatedSagach = {
       ...selectedSagach,
-      estimatedCompletion: editDateValue
+      estimatedCompletion: convertedDate || undefined
     }
     
     updateSagachimStatus(selectedSagach.id, updatedSagach)
@@ -902,6 +961,56 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     setEditDateValue('')
   }
 
+  // Handle start date editing functions
+  const handleEditStartDateClick = () => {
+    if (!selectedSagach) return
+    
+    // Check permission for editing start date
+    if (!canEditStatus()) {
+      window.dispatchEvent(new CustomEvent('excel:status', { 
+        detail: { 
+          message: 'אין לך הרשאה לערוך תאריך התחלה', 
+          type: 'error', 
+          durationMs: 3000 
+        } 
+      }))
+      return
+    }
+    
+    const currentStartDate = selectedSagach.processStartDate ? formatDateForDisplay(selectedSagach.processStartDate) : ''
+    setEditStartDateValue(currentStartDate)
+    setIsEditingStartDate(true)
+  }
+
+  const handleSaveStartDate = () => {
+    if (!selectedSagach) return
+    
+    // Convert string to datetime
+    const convertedDate = convertStringToDate(editStartDateValue)
+    
+    if (editStartDateValue.trim() && !convertedDate) {
+      showPopupIndicator('פורמט תאריך לא תקין. השתמש בפורמט DD/MM/YYYY', 'warning')
+      return
+    }
+    
+    const updatedSagach = {
+      ...selectedSagach,
+      processStartDate: convertedDate || undefined
+    }
+    
+    updateSagachimStatus(selectedSagach.id, updatedSagach)
+    
+    setSelectedSagach(updatedSagach)
+    setIsEditingStartDate(false)
+    
+    showPopupIndicator('תאריך התחלה עודכן בהצלחה', 'success')
+  }
+
+  const handleCancelStartDateEdit = () => {
+    setIsEditingStartDate(false)
+    setEditStartDateValue('')
+  }
+
   // Handle details editing functions
   const handleStartEditing = () => {
     if (!selectedSagach) return
@@ -913,6 +1022,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
       priority: selectedSagach.priority,
       sagachType: selectedSagach.sagachType || '',
       processStatus: selectedSagach.processStatus,
+      processStartDate: selectedSagach.processStartDate ? formatDateForDisplay(selectedSagach.processStartDate) : '',
       attachments: selectedSagach.attachments || []
     })
     setIsEditingDetails(true)
@@ -942,6 +1052,13 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         await handleProcessStatusUpdate(editValues.processStatus as 1 | 2 | 3 | 4 | 5 | 6 | 7)
       } else {
         // Regular details update without status change
+        const convertedStartDate = editValues.processStartDate.trim() ? convertStringToDate(editValues.processStartDate.trim()) : null
+        
+        if (editValues.processStartDate.trim() && !convertedStartDate) {
+          showPopupIndicator('פורמט תאריך התחלה לא תקין. השתמש בפורמט DD/MM/YYYY', 'warning')
+          return
+        }
+        
         const updatedSagach = {
           ...selectedSagach,
           description: editValues.description.trim(),
@@ -949,6 +1066,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
           arena: editValues.arena,
           priority: editValues.priority,
           sagachType: editValues.sagachType.trim() || undefined,
+          processStartDate: convertedStartDate || undefined,
           attachments: editValues.attachments,
           lastUpdated: formatDateWithSlashes(getCurrentDate())
         }
@@ -958,6 +1076,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
           provider: editValues.provider.trim(),
           arena: editValues.arena,
           priority: editValues.priority,
+          processStartDate: convertedStartDate || undefined,
           attachments: editValues.attachments,
           lastUpdated: formatDateWithSlashes(getCurrentDate())
         }
@@ -1118,6 +1237,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
       priority: 'בינוני' as PriorityOption,
       sagachType: '',
       processStatus: 1,
+      processStartDate: '',
       attachments: []
     })
   }
@@ -3869,14 +3989,122 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                   }}>
                     תאריך התחלה
                   </h4>
-                  <p style={{ 
-                    color: 'var(--text)', 
-                    fontSize: '18px', 
-                    margin: 0,
-                    lineHeight: '1.8' 
-                  }}>
-                    {selectedSagach.processStartDate ? formatDateWithSlashes(new Date(selectedSagach.processStartDate)) : 'לא צוין'}
-                  </p>
+                  {!isEditingStartDate ? (
+                    isEditingDetails && canEditStatus() ? (
+                      <p 
+                        style={{ 
+                          color: 'var(--text)', 
+                          fontSize: '18px', 
+                          margin: 0,
+                          lineHeight: '1.8',
+                          cursor: 'pointer',
+                          padding: '8px',
+                          borderRadius: '8px',
+                          border: '2px dashed rgba(124,192,255,0.3)',
+                          background: 'rgba(124,192,255,0.05)',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={handleEditStartDateClick}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.border = '2px dashed rgba(124,192,255,0.6)'
+                          e.currentTarget.style.background = 'rgba(124,192,255,0.1)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.border = '2px dashed rgba(124,192,255,0.3)'
+                          e.currentTarget.style.background = 'rgba(124,192,255,0.05)'
+                        }}
+                      >
+                        {selectedSagach.processStartDate ? formatDateForDisplay(selectedSagach.processStartDate) : 'לא צוין - לחץ לעריכה'}
+                      </p>
+                    ) : (
+                      <p style={{ 
+                        color: 'var(--text)', 
+                        fontSize: '18px', 
+                        margin: 0,
+                        lineHeight: '1.8' 
+                      }}>
+                        {selectedSagach.processStartDate ? formatDateForDisplay(selectedSagach.processStartDate) : 'לא צוין'}
+                      </p>
+                    )
+                  ) : (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={editStartDateValue}
+                        onChange={(e) => {
+                          // Allow only digits and slashes
+                          const value = e.target.value.replace(/[^\d\/]/g, '')
+                          setEditStartDateValue(value)
+                        }}
+                        placeholder="DD/MM/YYYY"
+                        maxLength={10}
+                        style={{
+                          background: 'var(--bg-secondary)',
+                          border: '2px solid rgba(124,192,255,0.5)',
+                          borderRadius: '8px',
+                          padding: '8px 12px',
+                          color: 'var(--text)',
+                          fontSize: '16px',
+                          fontFamily: 'Segoe UI, system-ui, sans-serif',
+                          width: '150px',
+                          direction: 'ltr',
+                          textAlign: 'center'
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSaveStartDate()
+                          } else if (e.key === 'Escape') {
+                            handleCancelStartDateEdit()
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleSaveStartDate}
+                        style={{
+                          background: 'rgba(34,197,94,0.8)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '8px 12px',
+                          color: 'white',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(34,197,94,1)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(34,197,94,0.8)'
+                        }}
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={handleCancelStartDateEdit}
+                        style={{
+                          background: 'rgba(239,68,68,0.8)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '8px 12px',
+                          color: 'white',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(239,68,68,1)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(239,68,68,0.8)'
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* 6. תג"ב למעבר לשלב הבא */}
@@ -3899,25 +4127,23 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                           margin: 0,
                           lineHeight: '1.8',
                           cursor: 'pointer',
-                          padding: '8px 12px',
+                          padding: '8px',
                           borderRadius: '8px',
-                          background: 'rgba(124,192,255,0.1)',
-                          border: '1px solid rgba(124,192,255,0.3)',
-                          transition: 'all 0.2s ease',
-                          direction: 'rtl'
+                          border: '2px dashed rgba(124,192,255,0.3)',
+                          background: 'rgba(124,192,255,0.05)',
+                          transition: 'all 0.2s ease'
                         }}
                         onClick={handleEditDateClick}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'rgba(124,192,255,0.2)'
-                          e.currentTarget.style.borderColor = 'rgba(124,192,255,0.5)'
+                          e.currentTarget.style.border = '2px dashed rgba(124,192,255,0.6)'
+                          e.currentTarget.style.background = 'rgba(124,192,255,0.1)'
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'rgba(124,192,255,0.1)'
-                          e.currentTarget.style.borderColor = 'rgba(124,192,255,0.3)'
+                          e.currentTarget.style.border = '2px dashed rgba(124,192,255,0.3)'
+                          e.currentTarget.style.background = 'rgba(124,192,255,0.05)'
                         }}
-                        title="לחץ לעריכת התאריך"
                       >
-                        {selectedSagach.estimatedCompletion || '-'}
+                        {selectedSagach.estimatedCompletion ? formatDateForDisplay(selectedSagach.estimatedCompletion) : 'לא צוין - לחץ לעריכה'}
                       </p>
                     ) : (
                       <p style={{ 
@@ -3927,94 +4153,86 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                         lineHeight: '1.8',
                         direction: 'rtl'
                       }}>
-                        {selectedSagach.estimatedCompletion || '-'}
+                        {selectedSagach.estimatedCompletion ? formatDateForDisplay(selectedSagach.estimatedCompletion) : 'לא צוין'}
                       </p>
                     )
                   ) : (
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px'
-                      }}>
-                        <input
-                          type="text"
-                          value={editDateValue}
-                          onChange={(e) => {
-                            setEditDateValue(e.target.value)
-                          }}
-                          placeholder="dd/MM/yyyy"
-                          style={{
-                            background: 'rgba(255,255,255,0.1)',
-                            border: '1px solid rgba(124,192,255,0.3)',
-                            borderRadius: '8px',
-                            padding: '12px',
-                            color: 'var(--text)',
-                            fontSize: '16px',
-                            direction: 'ltr',
-                            textAlign: 'right'
-                          }}
-                          autoFocus
-                        />
-                      </div>
-                      
-                      <div style={{
-                        display: 'flex',
-                        gap: '8px',
-                        justifyContent: 'flex-end'
-                      }}>
-                        <button
-                          onClick={handleSaveDate}
-                          style={{
-                            background: 'linear-gradient(135deg, rgba(76,175,80,0.8), rgba(76,175,80,0.6))',
-                            border: '1px solid rgba(76,175,80,0.5)',
-                            borderRadius: '6px',
-                            padding: '8px 16px',
-                            color: 'white',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-1px)'
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(76,175,80,0.3)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0px)'
-                            e.currentTarget.style.boxShadow = 'none'
-                          }}
-                        >
-                          ✓ שמור
-                        </button>
-                        
-                        <button
-                          onClick={handleCancelDateEdit}
-                          style={{
-                            background: 'rgba(255,255,255,0.1)',
-                            border: '1px solid rgba(255,255,255,0.2)',
-                            borderRadius: '6px',
-                            padding: '8px 16px',
-                            color: 'var(--text)',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
-                          }}
-                        >
-                          ❌ ביטול
-                        </button>
-                      </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={editDateValue}
+                        onChange={(e) => {
+                          // Allow only digits and slashes
+                          const value = e.target.value.replace(/[^\d\/]/g, '')
+                          setEditDateValue(value)
+                        }}
+                        placeholder="DD/MM/YYYY"
+                        maxLength={10}
+                        style={{
+                          background: 'var(--bg-secondary)',
+                          border: '2px solid rgba(124,192,255,0.5)',
+                          borderRadius: '8px',
+                          padding: '8px 12px',
+                          color: 'var(--text)',
+                          fontSize: '16px',
+                          fontFamily: 'Segoe UI, system-ui, sans-serif',
+                          width: '150px',
+                          direction: 'ltr',
+                          textAlign: 'center'
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSaveDate()
+                          } else if (e.key === 'Escape') {
+                            handleCancelDateEdit()
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleSaveDate}
+                        style={{
+                          background: 'rgba(34,197,94,0.8)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '8px 12px',
+                          color: 'white',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(34,197,94,1)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(34,197,94,0.8)'
+                        }}
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={handleCancelDateEdit}
+                        style={{
+                          background: 'rgba(239,68,68,0.8)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '8px 12px',
+                          color: 'white',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(239,68,68,1)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(239,68,68,0.8)'
+                        }}
+                      >
+                        ✕
+                      </button>
                     </div>
                   )}
                 </div>
