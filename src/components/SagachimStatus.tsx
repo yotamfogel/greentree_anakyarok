@@ -405,40 +405,58 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
 
   // Check if a Sagach is overdue (expected date has passed but hasn't moved to next stage)
   const isSagachOverdue = (sagach: SagachimStatusItem): boolean => {
-    console.log(`🔍 Checking overdue status for ${sagach.name}:`)
-    console.log(`  Full sagach object:`, sagach)
-    console.log(`  estimatedCompletion: "${sagach.estimatedCompletion}"`)
-    console.log(`  estimatedCompletion type: ${typeof sagach.estimatedCompletion}`)
-    console.log(`  estimatedCompletion truthy: ${!!sagach.estimatedCompletion}`)
-    console.log(`  estimatedCompletion length: ${sagach.estimatedCompletion?.length}`)
+    // Don't mark completed sagachs as overdue
+    if (sagach.processStatus === 7) {
+      return false
+    }
     
     if (!sagach.estimatedCompletion) {
-      console.log(`  ❌ No estimated completion date - not overdue`)
-      console.log(`  Why is it falsy? estimatedCompletion = "${sagach.estimatedCompletion}"`)
       return false
     }
     
     try {
-      const expectedDate = new Date(sagach.estimatedCompletion)
-      const currentDate = getCurrentDate() // Use the current date (mock or real)
+      let expectedDate: Date
+      const currentDate = getCurrentDate()
       
-      console.log(`  Expected date (raw): "${sagach.estimatedCompletion}"`)
-      console.log(`  Expected date (parsed): ${expectedDate.toISOString()}`)
-      console.log(`  Current date: ${currentDate.toISOString()}`)
+      // Try different date formats
+      const dateString = sagach.estimatedCompletion.trim()
       
-      // For ISO dates, we don't need to adjust hours - just compare dates
+      // Check if it's in DD/MM/YYYY format
+      const ddMMyyyyRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+      const ddMMyyyyMatch = dateString.match(ddMMyyyyRegex)
+      
+      if (ddMMyyyyMatch) {
+        // DD/MM/YYYY format
+        const day = parseInt(ddMMyyyyMatch[1])
+        const month = parseInt(ddMMyyyyMatch[2]) - 1 // JavaScript months are 0-based
+        const year = parseInt(ddMMyyyyMatch[3])
+        expectedDate = new Date(year, month, day)
+      } else {
+        // Try standard Date parsing
+        expectedDate = new Date(sagach.estimatedCompletion)
+      }
+      
+      // Check if the date is valid
+      if (isNaN(expectedDate.getTime())) {
+        return false
+      }
+      
+      // Compare dates (date only, no time)
       const expectedDateOnly = new Date(expectedDate.getFullYear(), expectedDate.getMonth(), expectedDate.getDate())
       const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
       
-      console.log(`  Expected date (date only): ${expectedDateOnly.toISOString()}`)
-      console.log(`  Current date (date only): ${currentDateOnly.toISOString()}`)
-      
       const isOverdue = expectedDateOnly < currentDateOnly
       
-      console.log(`  Is overdue: ${isOverdue}`)
-      console.log(`  Comparison: ${expectedDateOnly.getTime()} < ${currentDateOnly.getTime()} = ${expectedDateOnly.getTime() < currentDateOnly.getTime()}`)
+      // Log for debugging - only for specific sagach to avoid loops
+      if (sagach.name === 'dsa') {
+        console.log(`🔍 OVERDUE CHECK for "${sagach.name}":`)
+        console.log(`  estimatedCompletion: "${sagach.estimatedCompletion}"`)
+        console.log(`  processStatus: ${sagach.processStatus}`)
+        console.log(`  expectedDateOnly: ${expectedDateOnly.toISOString()}`)
+        console.log(`  currentDateOnly: ${currentDateOnly.toISOString()}`)
+        console.log(`  isOverdue: ${isOverdue}`)
+      }
       
-      // Return true if expected date has passed
       return isOverdue
     } catch (error) {
       console.error('Error checking overdue status:', error)
@@ -577,9 +595,9 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     if (isCurrentPhase && phaseData.currentEntry?.startDate) {
       const startDate = new Date(phaseData.currentEntry.startDate + 'T00:00:00')
       const currentDateValue = getCurrentDate()
-      const currentDate = new Date(currentDateValue.toISOString().split('T')[0] + 'T23:59:59')
+      const currentDate = new Date(currentDateValue.toISOString().split('T')[0] + 'T00:00:00')
       const diffTime = Math.max(0, currentDate.getTime() - startDate.getTime())
-      const ongoingDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
+      const ongoingDays = Math.max(1, Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1)
 
       return baseWithoutCurrent + ongoingDays
     }
@@ -724,6 +742,14 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   // Filter and sort sagachim based on search, filters, and sort order
   const filteredSagachim = useMemo(() => {
     console.log('🔍 Filtering sagachim. Total sagachs:', sagachimStatus.length)
+    console.log('🔍 All sagachim data:', sagachimStatus)
+    
+    // Log each sagach's estimatedCompletion and overdue status
+    sagachimStatus.forEach(sagach => {
+      const isOverdue = isSagachOverdue(sagach)
+      console.log(`🔍 Sagach "${sagach.name}": estimatedCompletion = "${sagach.estimatedCompletion}", processStatus = ${sagach.processStatus}, isOverdue = ${isOverdue}`)
+    })
+    
     let filtered = sagachimStatus.filter(sagach => {
       // Hide completed sagachs after 1 week
       if (sagach.processStatus === 7 && sagach.completionDate) {
@@ -2511,11 +2537,15 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                       const isOverdue = isSagachOverdue(sagach)
                       const isCompleted = sagach.processStatus === 7
                       
-                      console.log(`🎨 Rendering card for ${sagach.name}:`)
-                      console.log(`  isOverdue: ${isOverdue}`)
-                      console.log(`  isCompleted: ${isCompleted}`)
-                      console.log(`  estimatedCompletion: ${sagach.estimatedCompletion}`)
-                      console.log(`  🎨 WILL APPLY ORANGE STYLING: ${isOverdue}`)
+                      // Log for debugging - only for specific sagach
+                      if (sagach.name === 'dsa') {
+                        console.log(`🎨 RENDERING CARD for "${sagach.name}":`)
+                        console.log(`  estimatedCompletion: "${sagach.estimatedCompletion}"`)
+                        console.log(`  processStatus: ${sagach.processStatus}`)
+                        console.log(`  isOverdue: ${isOverdue}`)
+                        console.log(`  isCompleted: ${isCompleted}`)
+                        console.log(`  🎨 WILL APPLY ORANGE STYLING: ${isOverdue}`)
+                      }
                       
                       return (
           <div
@@ -2525,19 +2555,19 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                               background: isCompleted 
                                 ? 'linear-gradient(180deg, rgba(76,175,80,0.15), rgba(46,125,50,0.10))'
                                 : isOverdue
-                                ? 'linear-gradient(180deg, rgba(255,165,0,0.15), rgba(255,140,0,0.10))'
+                                ? 'linear-gradient(180deg, rgba(255,165,0,0.25), rgba(255,140,0,0.20))'
                                 : 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06))',
                               border: isCompleted
                                 ? '1px solid rgba(76,175,80,0.3)'
                                 : isOverdue
-                                ? '1px solid rgba(255,165,0,0.3)'
+                                ? '2px solid rgba(255,165,0,0.6)'
                                 : '1px solid rgba(255,255,255,0.12)',
                               borderRadius: '16px',
                               padding: '24px',
                               boxShadow: isCompleted
                                 ? '0 8px 32px rgba(76,175,80,0.2), inset 0 1px 0 rgba(76,175,80,0.1)'
                                 : isOverdue
-                                ? '0 8px 32px rgba(255,165,0,0.2), inset 0 1px 0 rgba(255,165,0,0.1)'
+                                ? '0 8px 32px rgba(255,165,0,0.4), inset 0 1px 0 rgba(255,165,0,0.2)'
                                 : '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
               backdropFilter: 'blur(8px)',
               transition: 'all 0.3s ease',
@@ -2552,7 +2582,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
               e.currentTarget.style.boxShadow = isCompleted
                 ? '0 12px 40px rgba(76,175,80,0.3), inset 0 1px 0 rgba(76,175,80,0.15)'
                 : isOverdue
-                ? '0 12px 40px rgba(255,165,0,0.3), inset 0 1px 0 rgba(255,165,0,0.15)'
+                ? '0 12px 40px rgba(255,165,0,0.5), inset 0 1px 0 rgba(255,165,0,0.25)'
                 : '0 12px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)'
             }}
             onMouseLeave={(e) => {
@@ -2795,19 +2825,19 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                               background: isCompleted 
                                 ? 'linear-gradient(180deg, rgba(76,175,80,0.15), rgba(46,125,50,0.10))'
                                 : isOverdue
-                                ? 'linear-gradient(180deg, rgba(255,165,0,0.15), rgba(255,140,0,0.10))'
+                                ? 'linear-gradient(180deg, rgba(255,165,0,0.25), rgba(255,140,0,0.20))'
                                 : 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06))',
                               border: isCompleted
                                 ? '1px solid rgba(76,175,80,0.3)'
                                 : isOverdue
-                                ? '1px solid rgba(255,165,0,0.3)'
+                                ? '2px solid rgba(255,165,0,0.6)'
                                 : '1px solid rgba(255,255,255,0.12)',
                               borderRadius: '16px',
                               padding: '24px',
                               boxShadow: isCompleted
                                 ? '0 8px 32px rgba(76,175,80,0.2), inset 0 1px 0 rgba(76,175,80,0.1)'
                                 : isOverdue
-                                ? '0 8px 32px rgba(255,165,0,0.2), inset 0 1px 0 rgba(255,165,0,0.1)'
+                                ? '0 8px 32px rgba(255,165,0,0.4), inset 0 1px 0 rgba(255,165,0,0.2)'
                                 : '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
                               backdropFilter: 'blur(8px)',
                               transition: 'all 0.3s ease',
@@ -2830,7 +2860,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                               e.currentTarget.style.boxShadow = isCompleted
                                 ? '0 8px 32px rgba(76,175,80,0.2), inset 0 1px 0 rgba(76,175,80,0.1)'
                                 : isOverdue
-                                ? '0 8px 32px rgba(255,165,0,0.2), inset 0 1px 0 rgba(255,165,0,0.1)'
+                                ? '0 8px 32px rgba(255,165,0,0.4), inset 0 1px 0 rgba(255,165,0,0.2)'
                                 : '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
                             }}
                           >
@@ -3028,21 +3058,31 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                 justifyItems: 'center',
                 width: '100%'
               }}>
-                {filteredSagachim.map(sagach => (
+                {filteredSagachim.map(sagach => {
+                  const isOverdue = isSagachOverdue(sagach)
+                  const isCompleted = sagach.processStatus === 7
+                  
+                  return (
                   <div
                     key={sagach.id}
                     onClick={() => handleSagachClick(sagach)}
                     style={{
-                      background: sagach.processStatus === 7 
+                      background: isCompleted 
                         ? 'linear-gradient(180deg, rgba(76,175,80,0.15), rgba(46,125,50,0.10))'
+                        : isOverdue
+                        ? 'linear-gradient(180deg, rgba(255,165,0,0.25), rgba(255,140,0,0.20))'
                         : 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06))',
-                      border: sagach.processStatus === 7
+                      border: isCompleted
                         ? '1px solid rgba(76,175,80,0.3)'
+                        : isOverdue
+                        ? '2px solid rgba(255,165,0,0.6)'
                         : '1px solid rgba(255,255,255,0.12)',
                       borderRadius: '16px',
                       padding: '24px',
-                      boxShadow: sagach.processStatus === 7
+                      boxShadow: isCompleted
                         ? '0 8px 32px rgba(76,175,80,0.2), inset 0 1px 0 rgba(76,175,80,0.1)'
+                        : isOverdue
+                        ? '0 8px 32px rgba(255,165,0,0.4), inset 0 1px 0 rgba(255,165,0,0.2)'
                         : '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
                       backdropFilter: 'blur(8px)',
                       transition: 'all 0.3s ease',
@@ -3054,14 +3094,18 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'translateY(-4px)'
-                      e.currentTarget.style.boxShadow = sagach.processStatus === 7
+                      e.currentTarget.style.boxShadow = isCompleted
                         ? '0 12px 40px rgba(76,175,80,0.3), inset 0 1px 0 rgba(76,175,80,0.15)'
+                        : isOverdue
+                        ? '0 12px 40px rgba(255,165,0,0.5), inset 0 1px 0 rgba(255,165,0,0.25)'
                         : '0 12px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)'
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0px)'
-                      e.currentTarget.style.boxShadow = sagach.processStatus === 7
+                      e.currentTarget.style.boxShadow = isCompleted
                         ? '0 8px 32px rgba(76,175,80,0.2), inset 0 1px 0 rgba(76,175,80,0.1)'
+                        : isOverdue
+                        ? '0 8px 32px rgba(255,165,0,0.4), inset 0 1px 0 rgba(255,165,0,0.2)'
                         : '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
                     }}
                   >
@@ -3108,7 +3152,29 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                         gap: '6px',
                         boxShadow: '0 6px 18px rgba(255, 0, 0, 0.35)'
                       }}>
-                        TOP
+                        🔥 TOP
+                      </div>
+                    )}
+
+                    {isOverdue && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '50px',
+                        left: '16px',
+                        background: 'linear-gradient(135deg, rgba(255, 193, 7, 0.9), rgba(255, 152, 0, 0.8))',
+                        color: '#1f1f1f',
+                        padding: '6px 12px',
+                        borderRadius: '999px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        letterSpacing: '0.5px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 6px 18px rgba(255, 193, 7, 0.35)',
+                        direction: 'rtl'
+                      }}>
+                        ⚠️ לא עומד בתג"ב
                       </div>
                     )}
 
@@ -3253,7 +3319,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                       pointerEvents: 'none'
                     }} />
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )
           }
