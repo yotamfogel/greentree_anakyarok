@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, type CSSProperties } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback, type CSSProperties } from 'react'
 import { buildTree, TreeNodeData } from './utils/parser'
 import { TreeView } from './components/TreeView'
 import { DynamicConnectors } from './components/DynamicConnectors'
@@ -265,7 +265,7 @@ function AppContent() {
     return unmappedMandatoryLeaves
   }, [unmappedMandatoryLeaves])
 
-  const onVisualize = () => {
+  const onVisualize = useCallback(() => {
     try {
       // Guard: require schema selection
       if (!selectedSchema) {
@@ -292,7 +292,7 @@ function AppContent() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse JSON')
     }
-  }
+  }, [selectedSchema, savedMappings])
   /*let the tree visualize a json schema instead of a json file while performing the following tasks:
   1. Give cubes a tint color by the following rules:
   a. if a field is required, tint the cube red
@@ -300,11 +300,11 @@ function AppContent() {
   c. if there's a field that is required ONLY IF its parent is filled up (the parent is not required), tint the cube orange
   
   2. When opening a cube with no children, display its description, and if there's a regex or validation for it - display it under text "Rules:" under the description.*/ 
-  const onClear = () => {
+  const onClear = useCallback(() => {
     setRawInput('')
     setTree(null)
     setError(null)
-  }
+  }, [])
 
   // Available schemas for users to pick from
   const availableSchemas = {

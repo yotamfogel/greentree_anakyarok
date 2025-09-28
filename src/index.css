@@ -54,6 +54,8 @@
     z-index: 200;
     width: auto;
   }
+  
+  /* Performance optimizations for tables - removed containment to restore original layout */
   .input-dropdown { overflow: clip; max-height: 0; transition: max-height 220ms ease; }
   .input-dropdown.open { max-height: 520px; }
   .input-dropdown.anchored {

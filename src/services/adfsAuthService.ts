@@ -105,7 +105,11 @@ export const acquireTokenSilently = async () => {
   } catch (error) {
     if (error instanceof InteractionRequiredAuthError) {
       // Fallback to interactive method
-      return await msal.acquireTokenPopup(request)
+      const interactiveRequest = {
+        ...loginRequest,
+        account: accounts[0]
+      }
+      return await msal.acquireTokenPopup(interactiveRequest)
     }
     throw error
   }

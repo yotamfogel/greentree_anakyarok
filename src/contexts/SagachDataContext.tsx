@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react'
 import { usePermissions } from './PermissionContext'
 
 // Sagach data interfaces
@@ -170,6 +170,7 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
     return data.map(item => ({
       ...item,
       priority: item.priority || 'בינוני',
+      arena: item.arena || [], // Add this line to ensure arena is always an array
       createdBy: item.createdBy || 'migrated',
       createdAt: item.createdAt || new Date().toISOString(),
       lastModifiedBy: item.lastModifiedBy || 'migrated',
@@ -506,7 +507,7 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
     }
   }, [])
 
-  const value: SagachDataContextType = {
+  const value: SagachDataContextType = useMemo(() => ({
     sagachs,
     addSagach,
     updateSagach,
@@ -519,7 +520,20 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
     subscribeToChanges,
     isLoading,
     error
-  }
+  }), [
+    sagachs,
+    addSagach,
+    updateSagach,
+    deleteSagach,
+    sagachimStatus,
+    addSagachimStatus,
+    updateSagachimStatus,
+    deleteSagachimStatus,
+    clearAllData,
+    subscribeToChanges,
+    isLoading,
+    error
+  ])
 
   // Expose clearAllData globally for easy access
   useEffect(() => {

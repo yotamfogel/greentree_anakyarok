@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { useSagachData } from '../contexts/SagachDataContext'
 
 interface SagachItem {
@@ -38,10 +38,7 @@ export const SagachimManager = () => {
     }
   }, [sagachs, selectedSagachId])
   
-  // Debug editingCell changes
-  useEffect(() => {
-    console.log('editingCell state changed to:', editingCell)
-  }, [editingCell])
+  // Debug editingCell changes - removed for performance
   const [changedItems, setChangedItems] = useState<Set<string>>(new Set())
   const [isCreatingNewSagach, setIsCreatingNewSagach] = useState(false)
   const [newSagachName, setNewSagachName] = useState<string>('')
@@ -1705,15 +1702,12 @@ interface TableRowProps {
   onDelete: (id: string) => void
 }
 
-const TableRow = ({ item, isEven, changes, editingCell, selectedCell, columnWidths, tableColumns, onCellClick, onCellSelect, onCellDoubleClick, onCellSave, onDelete }: TableRowProps) => {
+const TableRow = memo(({ item, isEven, changes, editingCell, selectedCell, columnWidths, tableColumns, onCellClick, onCellSelect, onCellDoubleClick, onCellSave, onDelete }: TableRowProps) => {
   const [editValue, setEditValue] = useState<string>('')
   const [clickTimeout, setClickTimeout] = useState<NodeJS.Timeout | null>(null)
   const [hoveredCell, setHoveredCell] = useState<string | null>(null)
   const [clickCount, setClickCount] = useState<number>(0)
   const [lastClickTime, setLastClickTime] = useState<number>(0)
-
-  // Debug: Log when component re-renders
-  console.log('TableRow re-rendered for item:', item.id, 'item data:', item)
 
 
   // Cleanup timeout on unmount
@@ -2089,7 +2083,9 @@ const TableRow = ({ item, isEven, changes, editingCell, selectedCell, columnWidt
       ))}
     </tr>
   )
-}
+})
+
+TableRow.displayName = 'TableRow'
 
 interface SagachCardProps {
   sagach: SagachTable

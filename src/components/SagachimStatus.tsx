@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+﻿import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react'
 import { usePermissions } from '../contexts/PermissionContext'
 import { useSagachData, ARENA_OPTIONS, type ArenaOption, type PhaseEntry, type PhaseData } from '../contexts/SagachDataContext'
 
@@ -120,7 +120,7 @@ if (typeof document !== 'undefined' && !document.head.querySelector('#spinner-an
   document.head.appendChild(style);
 }
 
-export const SagachimStatus = () => {
+export const SagachimStatus = memo(() => {
   const { canEditStatus, canCreateSagach, canDeleteSagach, canChat, user, hasRole } = usePermissions()
   const { sagachimStatus, addSagachimStatus, updateSagachimStatus, deleteSagachimStatus, clearAllData, isLoading, error } = useSagachData()
   
@@ -457,43 +457,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   }, [mockDate])
 
   // Debug log when sagachimStatus changes
-  useEffect(() => {
-    console.log('📊 SagachimStatus loaded:', sagachimStatus.length, 'items')
-    sagachimStatus.forEach((sagach, index) => {
-      console.log(`📊 Sagach ${index + 1}: ${sagach.name}`)
-      console.log(`  - estimatedCompletion: "${sagach.estimatedCompletion}"`)
-      console.log(`  - estimatedCompletion type: ${typeof sagach.estimatedCompletion}`)
-      console.log(`  - processStatus: ${sagach.processStatus}`)
-      console.log(`  - All sagach properties:`, Object.keys(sagach))
-      
-      // Check if there are any other date fields
-      Object.keys(sagach).forEach(key => {
-        if (key.toLowerCase().includes('date') || key.toLowerCase().includes('completion') || key.toLowerCase().includes('expected')) {
-          console.log(`  - ${key}: "${(sagach as any)[key]}"`)
-        }
-      })
-      
-      // DIRECT OVERDUE CHECK HERE
-      if (sagach.estimatedCompletion) {
-        try {
-          const expectedDate = new Date(sagach.estimatedCompletion)
-          const currentDate = getCurrentDate()
-          const expectedDateOnly = new Date(expectedDate.getFullYear(), expectedDate.getMonth(), expectedDate.getDate())
-          const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
-          const isOverdue = expectedDateOnly < currentDateOnly
-          
-          console.log(`  ✅ DIRECT OVERDUE CHECK:`)
-          console.log(`    Expected: ${expectedDateOnly.toISOString()}`)
-          console.log(`    Current: ${currentDateOnly.toISOString()}`)
-          console.log(`    Is Overdue: ${isOverdue}`)
-        } catch (error) {
-          console.log(`  ❌ Error in direct overdue check:`, error)
-        }
-      } else {
-        console.log(`  ❌ No estimatedCompletion - cannot check overdue`)
-      }
-    })
-  }, [sagachimStatus])
+  // Debug logging removed for performance
 
   // Update current date every minute to trigger re-renders for time calculations
   useEffect(() => {
@@ -6132,4 +6096,6 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     </style>
     </>
   )
-}
+})
+
+SagachimStatus.displayName = 'SagachimStatus'

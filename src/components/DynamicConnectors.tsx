@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 
 interface NodePosition {
   id: string
@@ -20,7 +20,7 @@ export function DynamicConnectors({ containerRef }: DynamicConnectorsProps) {
   const rafRef = useRef<number | null>(null)
   const smoothUntilRef = useRef<number>(0)
 
-  const updateNodePositions = () => {
+  const updateNodePositions = useCallback(() => {
     if (!containerRef.current) return
 
     const newPositions = new Map<string, NodePosition>()
@@ -88,7 +88,7 @@ export function DynamicConnectors({ containerRef }: DynamicConnectorsProps) {
     })
 
     setNodePositions(newPositions)
-  }
+  }, [])
 
   useEffect(() => {
     const smoothUpdatePositions = (ms = 400) => {
