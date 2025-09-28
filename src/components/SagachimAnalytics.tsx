@@ -156,6 +156,28 @@ export const SagachimAnalytics = () => {
        overallTotalCompleted: 0
      }
 
+    // Debug: Log the data we're working with
+    console.log('🔍 Analytics Debug - Total sagachimStatus items:', sagachimStatus.length)
+    const completedItems = sagachimStatus.filter(item => item.processStatus === 7)
+    console.log('🔍 Completed items:', completedItems.length)
+    completedItems.forEach((item, index) => {
+      console.log(`🔍 Item ${index + 1}:`, {
+        name: item.name,
+        processStartDate: item.processStartDate,
+        completionDate: item.completionDate,
+        processStatus: item.processStatus
+      })
+    })
+
+    // Check if we have any valid completed items with dates
+    const validCompletedItems = completedItems.filter(item => {
+      if (!item.processStartDate || !item.completionDate) return false
+      const start = new Date(item.processStartDate)
+      const end = new Date(item.completionDate)
+      return !isNaN(start.getTime()) && !isNaN(end.getTime()) && start < end
+    })
+    console.log('🔍 Valid completed items with dates:', validCompletedItems.length)
+
     // Get all completed sagachim for overall averages
     const allCompletedSagachim = sagachimStatus.filter(item => item.processStatus === 7)
     
@@ -218,7 +240,20 @@ export const SagachimAnalytics = () => {
       if (sagach.processStartDate && sagach.completionDate) {
         const start = new Date(sagach.processStartDate)
         const end = new Date(sagach.completionDate)
-        return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+        
+        // Validate dates
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          console.warn('Invalid date found in sagach:', sagach.name, 'start:', sagach.processStartDate, 'end:', sagach.completionDate)
+          return total
+        }
+        
+        const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+        if (daysDiff < 0) {
+          console.warn('Negative days difference for sagach:', sagach.name, 'days:', daysDiff)
+          return total
+        }
+        
+        return total + daysDiff
       }
       return total
     }, 0)
@@ -226,6 +261,13 @@ export const SagachimAnalytics = () => {
     const overallAverageImplementationDays = allCompletedSagachim.length > 0 
       ? Math.round((totalOverallImplementationDays / allCompletedSagachim.length) * 10) / 10 
       : 0
+
+    // Debug: Log calculation results
+    console.log('🔍 Overall calculation debug:', {
+      totalOverallImplementationDays,
+      allCompletedSagachimLength: allCompletedSagachim.length,
+      overallAverageImplementationDays
+    })
     
      if (completedSagachim.length === 0 || completedSagachimWithPhaseData.length === 0) {
        return {
@@ -276,7 +318,20 @@ export const SagachimAnalytics = () => {
       if (sagach.processStartDate && sagach.completionDate) {
         const start = new Date(sagach.processStartDate)
         const end = new Date(sagach.completionDate)
-        return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+        
+        // Validate dates
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          console.warn('Invalid date found in filtered sagach:', sagach.name, 'start:', sagach.processStartDate, 'end:', sagach.completionDate)
+          return total
+        }
+        
+        const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+        if (daysDiff < 0) {
+          console.warn('Negative days difference for filtered sagach:', sagach.name, 'days:', daysDiff)
+          return total
+        }
+        
+        return total + daysDiff
       }
       return total
     }, 0)
@@ -284,6 +339,15 @@ export const SagachimAnalytics = () => {
     const averageImplementationDays = completedSagachim.length > 0 
       ? Math.round((totalImplementationDays / completedSagachim.length) * 10) / 10 
       : 0
+
+    // Debug: Log filtered calculation results
+    console.log('🔍 Filtered calculation debug:', {
+      totalImplementationDays,
+      completedSagachimLength: completedSagachim.length,
+      averageImplementationDays,
+      selectedProvider,
+      selectedArena
+    })
 
      return {
        averageDaysPerPhase,
@@ -297,6 +361,11 @@ export const SagachimAnalytics = () => {
 
   // Helper function to get color based on comparison
   const getComparisonColor = (current: number, overall: number): string => {
+    // Handle NaN values
+    if (isNaN(current) || isNaN(overall)) {
+      return '#9E9E9E' // Gray for no data
+    }
+    
     const diff = Math.abs(current - overall)
     const tolerance = 0.5 // Tolerance for "same" values
     
@@ -431,7 +500,7 @@ export const SagachimAnalytics = () => {
                color: '#4CAF50',
                marginBottom: '8px'
              }}>
-               {analytics.overallAverageImplementationDays}
+               {isNaN(analytics.overallAverageImplementationDays) ? 'אין נתונים' : analytics.overallAverageImplementationDays}
              </div>
              <div style={{
                fontSize: '20px',
@@ -721,10 +790,10 @@ export const SagachimAnalytics = () => {
                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '16px'}}>
                      <span style={{ color: 'white', fontWeight: '600', fontSize: '26px' }}>ממוצע ימים למבצוע</span>
                      <div style={{ color: getComparisonColor(analytics.averageImplementationDays, analytics.overallAverageImplementationDays), fontWeight: '600', fontSize: '40px',marginTop: '16px' }}>
-                         {analytics.averageImplementationDays}
+                         {isNaN(analytics.averageImplementationDays) ? 'אין נתונים' : analytics.averageImplementationDays}
                      </div>
                      <div style={{ color: 'rgba(255,255,255,0.7)', fontWeight: '400', fontSize: '18px', marginTop: '8px' }}>
-                         ממוצע כולל: {analytics.overallAverageImplementationDays} ימים
+                         ממוצע כולל: {isNaN(analytics.overallAverageImplementationDays) ? 'אין נתונים' : analytics.overallAverageImplementationDays} ימים
                      </div>
                      </div>
             </div>
@@ -813,7 +882,10 @@ export const SagachimAnalytics = () => {
           fontSize: '14px',
           color: 'var(--muted)'
         }}>
-          האנליטיקות מבוססות על סג"חים שהוכנסו למערכת ומובצעו
+          {analytics.overallTotalCompleted === 0 
+            ? 'אין סג"חים מובצעים במערכת - האנליטיקות יופיעו לאחר הכנסת סג"חים וסימונם כמובצעים'
+            : 'האנליטיקות מבוססות על סג"חים שהוכנסו למערכת ומובצעו'
+          }
         </div>
       </div>
 

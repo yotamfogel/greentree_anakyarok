@@ -313,7 +313,9 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
 
   // Get current date (mock or real)
-  const getCurrentDate = () => mockDate || new Date()
+  const getCurrentDate = () => {
+    return mockDate || new Date()
+  }
 
   // Date conversion utilities
   const convertStringToDate = (dateString: string): string | null => {
@@ -330,7 +332,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     const monthNum = parseInt(month, 10)
     const yearNum = parseInt(year, 10)
     
-    // Validate date
+    // Validate date ranges
     if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12 || yearNum < 1900) {
       return null
     }
@@ -342,6 +344,46 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     }
     
     return date.toISOString()
+  }
+
+  // Helper function to get specific error message for invalid dates
+  const getDateValidationError = (dateString: string): string | null => {
+    if (!dateString.trim()) return null
+    
+    // Check if it's in DD/MM/YYYY format
+    const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+    const match = dateString.match(dateRegex)
+    
+    if (!match) return 'פורמט תאריך לא תקין. השתמש בפורמט DD/MM/YYYY'
+    
+    const [, day, month, year] = match
+    const dayNum = parseInt(day, 10)
+    const monthNum = parseInt(month, 10)
+    const yearNum = parseInt(year, 10)
+    
+    // Check specific validations
+    if (yearNum < 1900) {
+      return 'שנת התאריך חייבת להיות 1900 או מאוחר יותר'
+    }
+    
+    if (monthNum < 1 || monthNum > 12) {
+      return 'חודש התאריך חייב להיות בין 1 ל-12'
+    }
+    
+    if (dayNum < 1 || dayNum > 31) {
+      return 'יום התאריך חייב להיות בין 1 ל-31'
+    }
+    
+    // Check if the date actually exists
+    const date = new Date(yearNum, monthNum - 1, dayNum)
+    if (date.getFullYear() !== yearNum || date.getMonth() !== monthNum - 1 || date.getDate() !== dayNum) {
+      const monthNames = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 
+                         'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר']
+      const daysInMonth = new Date(yearNum, monthNum, 0).getDate()
+      return `${dayNum} ${monthNames[monthNum - 1]} ${yearNum} אינו תאריך תקין. ${monthNames[monthNum - 1]} ${yearNum} יש לו רק ${daysInMonth} ימים`
+    }
+    
+    return null
   }
 
   const formatDateForDisplay = (dateString: string): string => {
@@ -361,14 +403,97 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     }
   }
 
+  // Check if a Sagach is overdue (expected date has passed but hasn't moved to next stage)
+  const isSagachOverdue = (sagach: SagachimStatusItem): boolean => {
+    console.log(`🔍 Checking overdue status for ${sagach.name}:`)
+    console.log(`  Full sagach object:`, sagach)
+    console.log(`  estimatedCompletion: "${sagach.estimatedCompletion}"`)
+    console.log(`  estimatedCompletion type: ${typeof sagach.estimatedCompletion}`)
+    console.log(`  estimatedCompletion truthy: ${!!sagach.estimatedCompletion}`)
+    console.log(`  estimatedCompletion length: ${sagach.estimatedCompletion?.length}`)
+    
+    if (!sagach.estimatedCompletion) {
+      console.log(`  ❌ No estimated completion date - not overdue`)
+      console.log(`  Why is it falsy? estimatedCompletion = "${sagach.estimatedCompletion}"`)
+      return false
+    }
+    
+    try {
+      const expectedDate = new Date(sagach.estimatedCompletion)
+      const currentDate = getCurrentDate() // Use the current date (mock or real)
+      
+      console.log(`  Expected date (raw): "${sagach.estimatedCompletion}"`)
+      console.log(`  Expected date (parsed): ${expectedDate.toISOString()}`)
+      console.log(`  Current date: ${currentDate.toISOString()}`)
+      
+      // For ISO dates, we don't need to adjust hours - just compare dates
+      const expectedDateOnly = new Date(expectedDate.getFullYear(), expectedDate.getMonth(), expectedDate.getDate())
+      const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
+      
+      console.log(`  Expected date (date only): ${expectedDateOnly.toISOString()}`)
+      console.log(`  Current date (date only): ${currentDateOnly.toISOString()}`)
+      
+      const isOverdue = expectedDateOnly < currentDateOnly
+      
+      console.log(`  Is overdue: ${isOverdue}`)
+      console.log(`  Comparison: ${expectedDateOnly.getTime()} < ${currentDateOnly.getTime()} = ${expectedDateOnly.getTime() < currentDateOnly.getTime()}`)
+      
+      // Return true if expected date has passed
+      return isOverdue
+    } catch (error) {
+      console.error('Error checking overdue status:', error)
+      return false
+    }
+  }
+
   // Update current date when mock date changes
   useEffect(() => {
     if (mockDate) {
       setCurrentDate(mockDate)
+      console.log('🗓️ Mock date changed to:', mockDate.toISOString())
     } else {
       setCurrentDate(new Date())
     }
   }, [mockDate])
+
+  // Debug log when sagachimStatus changes
+  useEffect(() => {
+    console.log('📊 SagachimStatus loaded:', sagachimStatus.length, 'items')
+    sagachimStatus.forEach((sagach, index) => {
+      console.log(`📊 Sagach ${index + 1}: ${sagach.name}`)
+      console.log(`  - estimatedCompletion: "${sagach.estimatedCompletion}"`)
+      console.log(`  - estimatedCompletion type: ${typeof sagach.estimatedCompletion}`)
+      console.log(`  - processStatus: ${sagach.processStatus}`)
+      console.log(`  - All sagach properties:`, Object.keys(sagach))
+      
+      // Check if there are any other date fields
+      Object.keys(sagach).forEach(key => {
+        if (key.toLowerCase().includes('date') || key.toLowerCase().includes('completion') || key.toLowerCase().includes('expected')) {
+          console.log(`  - ${key}: "${(sagach as any)[key]}"`)
+        }
+      })
+      
+      // DIRECT OVERDUE CHECK HERE
+      if (sagach.estimatedCompletion) {
+        try {
+          const expectedDate = new Date(sagach.estimatedCompletion)
+          const currentDate = getCurrentDate()
+          const expectedDateOnly = new Date(expectedDate.getFullYear(), expectedDate.getMonth(), expectedDate.getDate())
+          const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
+          const isOverdue = expectedDateOnly < currentDateOnly
+          
+          console.log(`  ✅ DIRECT OVERDUE CHECK:`)
+          console.log(`    Expected: ${expectedDateOnly.toISOString()}`)
+          console.log(`    Current: ${currentDateOnly.toISOString()}`)
+          console.log(`    Is Overdue: ${isOverdue}`)
+        } catch (error) {
+          console.log(`  ❌ Error in direct overdue check:`, error)
+        }
+      } else {
+        console.log(`  ❌ No estimatedCompletion - cannot check overdue`)
+      }
+    })
+  }, [sagachimStatus])
 
   // Update current date every minute to trigger re-renders for time calculations
   useEffect(() => {
@@ -634,6 +759,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
 
   // Filter and sort sagachim based on search, filters, and sort order
   const filteredSagachim = useMemo(() => {
+    console.log('🔍 Filtering sagachim. Total sagachs:', sagachimStatus.length)
     let filtered = sagachimStatus.filter(sagach => {
       // Hide completed sagachs after 1 week
       if (sagach.processStatus === 7 && sagach.completionDate) {
@@ -669,6 +795,11 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         return 0
       })
     }
+
+    console.log('🔍 Filtered sagachs result:', filtered.length, 'sagachs')
+    filtered.forEach(sagach => {
+      console.log(`  - ${sagach.name} (processStatus: ${sagach.processStatus})`)
+    })
 
     return filtered
   }, [sagachimStatus, searchQuery, selectedProvider, selectedArena, selectedProcessStatus, sortOrder])
@@ -888,7 +1019,9 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         lastUpdated: formatDateWithSlashes(currentDate),
         phaseData: currentPhaseData,
         // Set completion date if status is changed to "מובצע" (7)
-        completionDate: newStatusValue === 7 ? currentDate.toISOString() : selectedSagach.completionDate
+        completionDate: newStatusValue === 7 ? currentDate.toISOString() : selectedSagach.completionDate,
+        // Reset estimatedCompletion to undefined when moving to next stage
+        estimatedCompletion: undefined
       }
       
       console.log('🔄 Changing status of sagach:', selectedSagach.name, 'to status', newStatusValue)
@@ -939,7 +1072,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     const convertedDate = convertStringToDate(editDateValue)
     
     if (editDateValue.trim() && !convertedDate) {
-      showPopupIndicator('פורמט תאריך לא תקין. השתמש בפורמט DD/MM/YYYY', 'warning')
+      const errorMessage = getDateValidationError(editDateValue)
+      showPopupIndicator(errorMessage || 'פורמט תאריך לא תקין. השתמש בפורמט DD/MM/YYYY', 'warning')
       return
     }
     
@@ -989,7 +1123,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     const convertedDate = convertStringToDate(editStartDateValue)
     
     if (editStartDateValue.trim() && !convertedDate) {
-      showPopupIndicator('פורמט תאריך לא תקין. השתמש בפורמט DD/MM/YYYY', 'warning')
+      const errorMessage = getDateValidationError(editStartDateValue)
+      showPopupIndicator(errorMessage || 'פורמט תאריך לא תקין. השתמש בפורמט DD/MM/YYYY', 'warning')
       return
     }
     
@@ -1055,7 +1190,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         const convertedStartDate = editValues.processStartDate.trim() ? convertStringToDate(editValues.processStartDate.trim()) : null
         
         if (editValues.processStartDate.trim() && !convertedStartDate) {
-          showPopupIndicator('פורמט תאריך התחלה לא תקין. השתמש בפורמט DD/MM/YYYY', 'warning')
+          const errorMessage = getDateValidationError(editValues.processStartDate.trim())
+          showPopupIndicator(errorMessage || 'פורמט תאריך התחלה לא תקין. השתמש בפורמט DD/MM/YYYY', 'warning')
           return
         }
         
@@ -2356,6 +2492,10 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
             const phaseOrder = sortOrder === 'desc' ? [7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7]
             return phaseOrder.map(phase => {
               const phaseSagachim = filteredSagachim.filter(sagach => sagach.processStatus === phase)
+              console.log(`📋 Phase ${phase}: ${phaseSagachim.length} sagachs`)
+              phaseSagachim.forEach(sagach => {
+                console.log(`  - ${sagach.name} (processStatus: ${sagach.processStatus})`)
+              })
               if (phaseSagachim.length === 0) return null
 
               return (
@@ -2403,22 +2543,38 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                     gap: '24px',
                     justifyItems: 'center'
                   }}>
-                    {phaseSagachim.map(sagach => (
+                    {phaseSagachim.map(sagach => {
+                      const isOverdue = isSagachOverdue(sagach)
+                      const isCompleted = sagach.processStatus === 7
+                      
+                      console.log(`🎨 Rendering card for ${sagach.name}:`)
+                      console.log(`  isOverdue: ${isOverdue}`)
+                      console.log(`  isCompleted: ${isCompleted}`)
+                      console.log(`  estimatedCompletion: ${sagach.estimatedCompletion}`)
+                      console.log(`  🎨 WILL APPLY ORANGE STYLING: ${isOverdue}`)
+                      
+                      return (
           <div
             key={sagach.id}
             onClick={() => handleSagachClick(sagach)}
             style={{
-              background: sagach.processStatus === 7 
-                ? 'linear-gradient(180deg, rgba(76,175,80,0.15), rgba(46,125,50,0.10))'
-                : 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06))',
-              border: sagach.processStatus === 7
-                ? '1px solid rgba(76,175,80,0.3)'
-                : '1px solid rgba(255,255,255,0.12)',
-              borderRadius: '16px',
-              padding: '24px',
-              boxShadow: sagach.processStatus === 7
-                ? '0 8px 32px rgba(76,175,80,0.2), inset 0 1px 0 rgba(76,175,80,0.1)'
-                : '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
+                              background: isCompleted 
+                                ? 'linear-gradient(180deg, rgba(76,175,80,0.15), rgba(46,125,50,0.10))'
+                                : isOverdue
+                                ? 'linear-gradient(180deg, rgba(255,165,0,0.15), rgba(255,140,0,0.10))'
+                                : 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06))',
+                              border: isCompleted
+                                ? '1px solid rgba(76,175,80,0.3)'
+                                : isOverdue
+                                ? '1px solid rgba(255,165,0,0.3)'
+                                : '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '16px',
+                              padding: '24px',
+                              boxShadow: isCompleted
+                                ? '0 8px 32px rgba(76,175,80,0.2), inset 0 1px 0 rgba(76,175,80,0.1)'
+                                : isOverdue
+                                ? '0 8px 32px rgba(255,165,0,0.2), inset 0 1px 0 rgba(255,165,0,0.1)'
+                                : '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
               backdropFilter: 'blur(8px)',
               transition: 'all 0.3s ease',
               cursor: 'pointer',
@@ -2429,14 +2585,18 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-4px)'
-              e.currentTarget.style.boxShadow = sagach.processStatus === 7
+              e.currentTarget.style.boxShadow = isCompleted
                 ? '0 12px 40px rgba(76,175,80,0.3), inset 0 1px 0 rgba(76,175,80,0.15)'
+                : isOverdue
+                ? '0 12px 40px rgba(255,165,0,0.3), inset 0 1px 0 rgba(255,165,0,0.15)'
                 : '0 12px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)'
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0px)'
-              e.currentTarget.style.boxShadow = sagach.processStatus === 7
+              e.currentTarget.style.boxShadow = isCompleted
                 ? '0 8px 32px rgba(76,175,80,0.2), inset 0 1px 0 rgba(76,175,80,0.1)'
+                : isOverdue
+                ? '0 8px 32px rgba(255,165,0,0.2), inset 0 1px 0 rgba(255,165,0,0.1)'
                 : '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
             }}
           >
@@ -2466,7 +2626,27 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
               }
             </div>
 
-
+            {isOverdue && (
+              <div style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'linear-gradient(135deg, rgba(255, 193, 7, 0.9), rgba(255, 152, 0, 0.8))',
+                color: '#1f1f1f',
+                padding: '6px 12px',
+                borderRadius: '999px',
+                fontSize: '11px',
+                fontWeight: '700',
+                letterSpacing: '0.5px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 6px 18px rgba(255, 193, 7, 0.35)',
+                direction: 'rtl'
+              }}>
+                ⚠️ לא עומד בתג"ב
+              </div>
+            )}
 
             {/* Content */}
             <div style={{ marginTop: '40px', direction: 'rtl' }}>
@@ -2552,15 +2732,18 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
               left: 0,
               right: 0,
               bottom: 0,
-              background: sagach.processStatus === 7
+              background: isCompleted
                 ? 'linear-gradient(135deg, rgba(76,175,80,0.15), rgba(46,125,50,0.1))'
+                : isOverdue
+                ? 'linear-gradient(135deg, rgba(255,165,0,0.15), rgba(255,140,0,0.1))'
                 : 'linear-gradient(135deg, rgba(124,192,255,0.1), rgba(167,90,255,0.1))',
               opacity: 0,
               transition: 'opacity 0.3s ease',
               pointerEvents: 'none'
             }} />
           </div>
-                    ))}
+          )
+        })}
                   </div>
                   
                   {/* Separator Line */}
@@ -2579,6 +2762,10 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
               <>
                 {phaseOrder.map(phase => {
                   const phaseSagachim = filteredSagachim.filter(sagach => sagach.processStatus === phase)
+                  console.log(`📋 Phase ${phase}: ${phaseSagachim.length} sagachs`)
+                  phaseSagachim.forEach(sagach => {
+                    console.log(`  - ${sagach.name} (processStatus: ${sagach.processStatus})`)
+                  })
                   if (phaseSagachim.length === 0) return null
 
                   return (
@@ -2626,21 +2813,37 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                         gap: '24px',
                         justifyItems: 'center'
                       }}>
-                        {phaseSagachim.map(sagach => (
+                        {phaseSagachim.map(sagach => {
+                          const isOverdue = isSagachOverdue(sagach)
+                          const isCompleted = sagach.processStatus === 7
+                          
+                          console.log(`🎨 Rendering card for ${sagach.name}:`)
+                          console.log(`  isOverdue: ${isOverdue}`)
+                          console.log(`  isCompleted: ${isCompleted}`)
+                          console.log(`  estimatedCompletion: ${sagach.estimatedCompletion}`)
+                          console.log(`  🎨 WILL APPLY ORANGE STYLING: ${isOverdue}`)
+                          
+                          return (
                           <div
                             key={sagach.id}
                             onClick={() => handleSagachClick(sagach)}
                             style={{
-                              background: sagach.processStatus === 7 
+                              background: isCompleted 
                                 ? 'linear-gradient(180deg, rgba(76,175,80,0.15), rgba(46,125,50,0.10))'
+                                : isOverdue
+                                ? 'linear-gradient(180deg, rgba(255,165,0,0.15), rgba(255,140,0,0.10))'
                                 : 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06))',
-                              border: sagach.processStatus === 7
+                              border: isCompleted
                                 ? '1px solid rgba(76,175,80,0.3)'
+                                : isOverdue
+                                ? '1px solid rgba(255,165,0,0.3)'
                                 : '1px solid rgba(255,255,255,0.12)',
                               borderRadius: '16px',
                               padding: '24px',
-                              boxShadow: sagach.processStatus === 7
+                              boxShadow: isCompleted
                                 ? '0 8px 32px rgba(76,175,80,0.2), inset 0 1px 0 rgba(76,175,80,0.1)'
+                                : isOverdue
+                                ? '0 8px 32px rgba(255,165,0,0.2), inset 0 1px 0 rgba(255,165,0,0.1)'
                                 : '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
                               backdropFilter: 'blur(8px)',
                               transition: 'all 0.3s ease',
@@ -2652,14 +2855,18 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.transform = 'translateY(-4px)'
-                              e.currentTarget.style.boxShadow = sagach.processStatus === 7
+                              e.currentTarget.style.boxShadow = isCompleted
                                 ? '0 12px 40px rgba(76,175,80,0.3), inset 0 1px 0 rgba(76,175,80,0.15)'
+                                : isOverdue
+                                ? '0 12px 40px rgba(255,165,0,0.3), inset 0 1px 0 rgba(255,165,0,0.15)'
                                 : '0 12px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)'
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.transform = 'translateY(0px)'
-                              e.currentTarget.style.boxShadow = sagach.processStatus === 7
+                              e.currentTarget.style.boxShadow = isCompleted
                                 ? '0 8px 32px rgba(76,175,80,0.2), inset 0 1px 0 rgba(76,175,80,0.1)'
+                                : isOverdue
+                                ? '0 8px 32px rgba(255,165,0,0.2), inset 0 1px 0 rgba(255,165,0,0.1)'
                                 : '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
                             }}
                           >
@@ -2689,7 +2896,29 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                               }
                             </div>
 
-                            {sagach.priority === 'TOP' && (
+                            {isOverdue && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '16px',
+                                right: '16px',
+                                background: 'linear-gradient(135deg, rgba(255, 193, 7, 0.9), rgba(255, 152, 0, 0.8))',
+                                color: '#1f1f1f',
+                                padding: '6px 12px',
+                                borderRadius: '999px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                letterSpacing: '0.5px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 6px 18px rgba(255, 193, 7, 0.35)',
+                                direction: 'rtl'
+                              }}>
+                                ⚠️ לא עומד בתג"ב
+                              </div>
+                            )}
+
+                            {sagach.priority === 'TOP' && !isOverdue && (
                               <div style={{
                                 position: 'absolute',
                                 top: '16px',
@@ -2793,15 +3022,18 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                               left: 0,
                               right: 0,
                               bottom: 0,
-                              background: sagach.processStatus === 7
+                              background: isCompleted
                                 ? 'linear-gradient(135deg, rgba(76,175,80,0.15), rgba(46,125,50,0.1))'
+                                : isOverdue
+                                ? 'linear-gradient(135deg, rgba(255,165,0,0.15), rgba(255,140,0,0.1))'
                                 : 'linear-gradient(135deg, rgba(124,192,255,0.1), rgba(167,90,255,0.1))',
                               opacity: 0,
                               transition: 'opacity 0.3s ease',
                               pointerEvents: 'none'
                             }} />
                           </div>
-                        ))}
+                          )
+                        })}
                       </div>
                       
                       {/* Separator Line */}
@@ -4033,7 +4265,20 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                         value={editStartDateValue}
                         onChange={(e) => {
                           // Allow only digits and slashes
-                          const value = e.target.value.replace(/[^\d\/]/g, '')
+                          let value = e.target.value.replace(/[^\d\/]/g, '')
+                          
+                          // Auto-format as user types
+                          if (value.length === 2 && !value.includes('/')) {
+                            value = value + '/'
+                          } else if (value.length === 5 && value.split('/').length === 2) {
+                            value = value + '/'
+                          }
+                          
+                          // Limit to DD/MM/YYYY format
+                          if (value.length > 10) {
+                            value = value.substring(0, 10)
+                          }
+                          
                           setEditStartDateValue(value)
                         }}
                         placeholder="DD/MM/YYYY"
@@ -4163,7 +4408,20 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                         value={editDateValue}
                         onChange={(e) => {
                           // Allow only digits and slashes
-                          const value = e.target.value.replace(/[^\d\/]/g, '')
+                          let value = e.target.value.replace(/[^\d\/]/g, '')
+                          
+                          // Auto-format as user types
+                          if (value.length === 2 && !value.includes('/')) {
+                            value = value + '/'
+                          } else if (value.length === 5 && value.split('/').length === 2) {
+                            value = value + '/'
+                          }
+                          
+                          // Limit to DD/MM/YYYY format
+                          if (value.length > 10) {
+                            value = value.substring(0, 10)
+                          }
+                          
                           setEditDateValue(value)
                         }}
                         placeholder="DD/MM/YYYY"
