@@ -30,11 +30,17 @@ export interface SagachTable {
 // Arena options available for selection
 export const ARENA_OPTIONS = [
   '110',
-  '130', 
+  '130',
   '150',
   '160',
+  '170',
   '180',
   '190',
+  '210',
+  'מוד"ש',
+  'פקמ"ז',
+  'פצ"ן',
+  'פד"ם',
   'על-זירתי'
 ] as const
 

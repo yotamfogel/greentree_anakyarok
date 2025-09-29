@@ -41,6 +41,21 @@ const PRIORITY_LABELS: Record<PriorityOption, string> = {
   'TOP': 'TOP'
 }
 
+const PROVIDER_OPTIONS = [
+  '7140',
+  '7190',
+  '7149',
+  '7170',
+  'גבעה',
+  'שב"כ',
+  'קש"ח',
+  'גדס"מ',
+  'הצריף',
+  '8153'
+] as const
+
+type ProviderOption = typeof PROVIDER_OPTIONS[number]
+
 interface FileAttachment {
   id: string
   name: string
@@ -235,6 +250,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   const [selectedProvider, setSelectedProvider] = useState<string>('')
   const [selectedArena, setSelectedArena] = useState<ArenaOption | ''>('')
   const [selectedProcessStatus, setSelectedProcessStatus] = useState<string>('')
+  const [selectedSagachType, setSelectedSagachType] = useState<string>('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none')
   const [selectedSagach, setSelectedSagach] = useState<SagachimStatusItem | null>(null)
   const [newUpdate, setNewUpdate] = useState<string>('')
@@ -246,11 +262,13 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   const [isProviderDropdownOpen, setIsProviderDropdownOpen] = useState<boolean>(false)
   const [isArenaDropdownOpen, setIsArenaDropdownOpen] = useState<boolean>(false)
   const [isProcessStatusDropdownOpen, setIsProcessStatusDropdownOpen] = useState<boolean>(false)
+  const [isSagachTypeDropdownOpen, setIsSagachTypeDropdownOpen] = useState<boolean>(false)
   const [isStatusEditDropdownOpen, setIsStatusEditDropdownOpen] = useState<boolean>(false)
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState<boolean>(false)
   const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState<boolean>(false)
   const [isEditArenaDropdownOpen, setIsEditArenaDropdownOpen] = useState<boolean>(false)
   const [isNewArenaDropdownOpen, setIsNewArenaDropdownOpen] = useState<boolean>(false)
+  const [isNewProviderDropdownOpen, setIsNewProviderDropdownOpen] = useState<boolean>(false)
   
   // Notification settings popup
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState<boolean>(false)
@@ -663,11 +681,13 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         setIsProviderDropdownOpen(false)
         setIsArenaDropdownOpen(false)
         setIsProcessStatusDropdownOpen(false)
+        setIsSagachTypeDropdownOpen(false)
         setIsStatusEditDropdownOpen(false)
         setIsSortDropdownOpen(false)
         setIsPriorityDropdownOpen(false)
         setIsEditArenaDropdownOpen(false)
         setIsNewArenaDropdownOpen(false)
+        setIsNewProviderDropdownOpen(false)
       }
     }
 
@@ -738,6 +758,11 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     return uniqueArenas.sort()
   }, [sagachimStatus])
 
+  const sagachTypes = useMemo(() => {
+    const uniqueSagachTypes = [...new Set(sagachimStatus.map(s => s.sagachType).filter(Boolean))]
+    return uniqueSagachTypes.sort()
+  }, [sagachimStatus])
+
 
   // Filter and sort sagachim based on search, filters, and sort order
   const filteredSagachim = useMemo(() => {
@@ -763,15 +788,16 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         }
       }
       
-      const matchesSearch = !searchQuery || 
+      const matchesSearch = !searchQuery ||
         sagach.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         sagach.description.toLowerCase().includes(searchQuery.toLowerCase())
-      
+
       const matchesProvider = !selectedProvider || sagach.provider === selectedProvider
       const matchesArena = !selectedArena || sagach.arena.includes(selectedArena)
       const matchesProcessStatus = !selectedProcessStatus || sagach.processStatus.toString() === selectedProcessStatus
-      
-      return matchesSearch && matchesProvider && matchesArena && matchesProcessStatus
+      const matchesSagachType = !selectedSagachType || (sagach.sagachType || '') === selectedSagachType
+
+      return matchesSearch && matchesProvider && matchesArena && matchesProcessStatus && matchesSagachType
     })
 
     // Sort by process status if sort order is specified
@@ -792,7 +818,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     })
 
     return filtered
-  }, [sagachimStatus, searchQuery, selectedProvider, selectedArena, selectedProcessStatus, sortOrder])
+  }, [sagachimStatus, searchQuery, selectedProvider, selectedArena, selectedProcessStatus, selectedSagachType, sortOrder])
 
   const getProcessStatusColor = (processStatus: number) => {
     switch (processStatus) {
@@ -1681,26 +1707,26 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
           .sagachim-grid-scroll::-webkit-scrollbar {
             width: 8px;
           }
-          
+
           .sagachim-grid-scroll::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.1);
+            background: #2d3748;
             border-radius: 4px;
           }
-          
+
           .sagachim-grid-scroll::-webkit-scrollbar-thumb {
-            background: rgba(124, 192, 255, 0.6);
+            background: #7cc0ff;
             border-radius: 4px;
             transition: background 0.3s ease;
           }
-          
+
           .sagachim-grid-scroll::-webkit-scrollbar-thumb:hover {
-            background: rgba(124, 192, 255, 0.8);
+            background: #5da3e6;
           }
-          
+
           /* For Firefox */
           .sagachim-grid-scroll {
             scrollbar-width: thin;
-            scrollbar-color: rgba(124, 192, 255, 0.6) rgba(255, 255, 255, 0.1);
+            scrollbar-color: #7cc0ff #2d3748;
           }
         `}
       </style>
@@ -2124,6 +2150,92 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
           )}
           </div>
 
+          {/* Sagach Type Filter */}
+          <div style={{ position: 'relative', minWidth: '160px', maxWidth: '220px', flex: '0 1 180px' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
+            <button
+              onClick={() => setIsSagachTypeDropdownOpen(!isSagachTypeDropdownOpen)}
+              style={buttonStyles.filter}
+              onMouseEnter={(e) => {
+                (e.target as HTMLButtonElement).style.transform = 'translateY(-1px)'
+              }}
+              onMouseLeave={(e) => {
+                (e.target as HTMLButtonElement).style.transform = 'translateY(0px)'
+              }}
+            >
+              <span>{selectedSagachType || 'כל סוגי הסג"ח'}</span>
+              <span style={{ marginLeft: '8px' }}>▼</span>
+            </button>
+            {isSagachTypeDropdownOpen && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                background: 'var(--panel)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '12px',
+                marginTop: '4px',
+                zIndex: 1000,
+                maxHeight: '200px',
+                overflowY: 'auto',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                backdropFilter: 'blur(8px)'
+              }}>
+                <div
+                  onClick={() => {
+                    setSelectedSagachType('')
+                    setIsSagachTypeDropdownOpen(false)
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    transition: 'background 0.2s ease',
+                    fontSize: '14px',
+                    color: '#ffffff',
+                    textAlign: 'center',
+                    direction: 'rtl'
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.target as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)'
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.target as HTMLDivElement).style.background = 'transparent'
+                  }}
+                >
+                  כל סוגי הסג"ח
+                </div>
+                {sagachTypes.map(sagachType => (
+                  <div
+                    key={sagachType}
+                    onClick={() => {
+                      setSelectedSagachType(sagachType || '')
+                      setIsSagachTypeDropdownOpen(false)
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid rgba(255,255,255,0.06)',
+                      transition: 'background 0.2s ease',
+                      fontSize: '14px',
+                      color: '#ffffff',
+                      textAlign: 'center',
+                      direction: 'rtl'
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.target as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)'
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.target as HTMLDivElement).style.background = 'transparent'
+                    }}
+                  >
+                    {sagachType}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Sort Dropdown */}
           <div style={{ position: 'relative', minWidth: '160px', maxWidth: '220px', flex: '0 1 180px' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
             <button
@@ -2287,7 +2399,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         </div>
 
         {/* Active Filters Display */}
-        {(selectedProvider || selectedArena || selectedProcessStatus || searchQuery) && (
+        {(selectedProvider || selectedArena || selectedProcessStatus || selectedSagachType || searchQuery) && (
           <div style={{
             display: 'flex',
             gap: '8px',
@@ -2440,6 +2552,41 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
               </div>
             )}
 
+            {selectedSagachType && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                background: 'rgba(124,192,255,0.2)',
+                border: '1px solid rgba(124,192,255,0.4)',
+                borderRadius: '20px',
+                padding: '6px 12px',
+                gap: '8px',
+                direction: 'rtl'
+              }}>
+                <span style={{
+                  color: 'var(--text)',
+                  fontSize: '12px',
+                  fontWeight: '500'
+                }}>
+                  סוג: {selectedSagachType}
+                </span>
+                <button
+                  onClick={() => setSelectedSagachType('')}
+                  style={buttonStyles.close}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
+                    e.currentTarget.style.color = 'var(--text)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'none'
+                    e.currentTarget.style.color = 'var(--muted)'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
           </div>
         )}
 
@@ -2474,7 +2621,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         }}>
         {/* Check if any filters are active */}
         {(() => {
-          const hasActiveFilters = selectedProvider || selectedArena || selectedProcessStatus || searchQuery || sortOrder !== 'none'
+          const hasActiveFilters = selectedProvider || selectedArena || selectedProcessStatus || selectedSagachType || searchQuery || sortOrder !== 'none'
           
           if (hasActiveFilters) {
             // Show phase-organized view when filters are active
@@ -5772,41 +5919,89 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                 }}>
                   ספק *
                 </label>
-                <input
-                  type="text"
-                  value={newSagachForm.provider}
-                  onChange={(e) => setNewSagachForm(prev => ({ ...prev, provider: e.target.value }))}
-                  placeholder="שם הספק..."
-                  disabled={isCreateSagachLoading}
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    background: 'rgba(255,255,255,0.08)',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '12px',
-                    color: 'var(--text)',
-                    fontSize: '14px',
-                    fontFamily: 'Segoe UI, sans-serif',
-                    outline: 'none',
-                    transition: 'all 0.2s ease',
-                    direction: 'rtl',
-                    opacity: isCreateSagachLoading ? 0.6 : 1,
-                    cursor: isCreateSagachLoading ? 'not-allowed' : 'text',
-                    boxSizing: 'border-box'
-                  }}
-                  onFocus={(e) => {
-                    if (!isCreateSagachLoading) {
-                      e.target.style.borderColor = 'rgba(124,192,255,0.6)'
-                      e.target.style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
-                    }
-                  }}
-                  onBlur={(e) => {
-                    if (!isCreateSagachLoading) {
-                      e.target.style.borderColor = 'rgba(255,255,255,0.2)'
-                      e.target.style.boxShadow = 'none'
-                    }
-                  }}
-                />
+                <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
+                  <button
+                    type="button"
+                    disabled={isCreateSagachLoading}
+                    onClick={() => setIsNewProviderDropdownOpen(prev => !prev)}
+                    style={{
+                      appearance: 'none',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      background: 'rgba(255,255,255,0.08)',
+                      borderRadius: '12px',
+                      color: isCreateSagachLoading ? 'rgba(255,255,255,0.5)' : '#ffffff',
+                      padding: '12px 16px',
+                      cursor: isCreateSagachLoading ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      direction: 'rtl',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                      fontFamily: 'Segoe UI, sans-serif',
+                      opacity: isCreateSagachLoading ? 0.6 : 1,
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span style={{ textAlign: 'right', flex: 1 }}>
+                      {newSagachForm.provider || 'בחר ספק...'}
+                    </span>
+                    <span style={{ marginLeft: '8px', fontSize: '12px' }}>▼</span>
+                  </button>
+
+                  {isNewProviderDropdownOpen && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      right: 0,
+                      left: 0,
+                      background: 'var(--panel)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '12px',
+                      marginTop: '4px',
+                      zIndex: 1000,
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                      backdropFilter: 'blur(8px)'
+                    }}>
+                      {PROVIDER_OPTIONS.map(provider => (
+                        <div
+                          key={provider}
+                          onClick={() => {
+                            setNewSagachForm(prev => ({ ...prev, provider }))
+                            setIsNewProviderDropdownOpen(false)
+                          }}
+                          style={{
+                            padding: '10px 16px',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid rgba(255,255,255,0.06)',
+                            transition: 'background 0.2s ease',
+                            fontSize: '14px',
+                            color: '#ffffff',
+                            textAlign: 'center',
+                            direction: 'rtl',
+                            background: newSagachForm.provider === provider ? 'rgba(124,192,255,0.15)' : 'transparent'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (newSagachForm.provider !== provider) {
+                              (e.target as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)'
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (newSagachForm.provider !== provider) {
+                              (e.target as HTMLDivElement).style.background = 'transparent'
+                            }
+                          }}
+                        >
+                          {provider}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Arena */}
