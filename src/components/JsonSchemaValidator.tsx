@@ -24,6 +24,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
   const [jsonInput, setJsonInput] = useState<string>('')
   const [selectedSchema, setSelectedSchema] = useState<string>('')
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
+  const [validationSnapshot, setValidationSnapshot] = useState<string>('')
   const [isValidating, setIsValidating] = useState<boolean>(false)
   const [isSchemaDropdownOpen, setIsSchemaDropdownOpen] = useState<boolean>(false)
 
@@ -683,6 +684,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
   const handleValidate = () => {
     if (!selectedSchema || !jsonInput.trim()) {
       setValidationResult(null)
+      setValidationSnapshot('')
       return
     }
 
@@ -698,11 +700,14 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
           errors: [{ path: 'schema', message: 'סכמה לא נמצאה' }],
           warnings: []
         })
+        setValidationSnapshot('')
         return
       }
 
       const result = validateJson(jsonData, schema)
       setValidationResult(result)
+      // Save the current JSON input as a snapshot for display
+      setValidationSnapshot(jsonInput)
     } catch (error) {
       setValidationResult({
         isValid: false,
@@ -712,6 +717,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
         }],
         warnings: []
       })
+      setValidationSnapshot('')
     } finally {
       setIsValidating(false)
     }
@@ -721,6 +727,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
     setJsonInput('')
     setSelectedSchema('')
     setValidationResult(null)
+    setValidationSnapshot('')
   }
 
   const getValidationIcon = (isValid: boolean) => {
@@ -729,6 +736,48 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
 
   const getValidationColor = (isValid: boolean) => {
     return isValid ? '#4caf50' : '#f44336'
+  }
+
+  // Function to render JSON with color-coded fields using standard formatting
+  const renderJsonWithHighlights = (jsonData: any, errors: any[], schema: any, path: string = ''): any => {
+    try {
+      // Recursively add missing fields to nested objects
+      const addMissingFields = (data: any, currentSchema: any, currentPath: string = ''): any => {
+        if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+          return data
+        }
+        
+        const result = { ...data }
+        const requiredFields = currentSchema?.required || []
+        const schemaProperties = currentSchema?.properties || {}
+        
+        // Add missing required fields
+        requiredFields.forEach((field: string) => {
+          if (!(field in result)) {
+            result[field] = '[שדה חסר]'
+          } else if (typeof result[field] === 'object' && result[field] !== null && !Array.isArray(result[field])) {
+            // Recursively process nested objects
+            const fieldPath = currentPath ? `${currentPath}.${field}` : field
+            const fieldSchema = schemaProperties[field]
+            if (fieldSchema) {
+              result[field] = addMissingFields(result[field], fieldSchema, fieldPath)
+            }
+          }
+        })
+        
+        return result
+      }
+      
+      // Add missing fields recursively
+      const dataWithMissingFields = addMissingFields(jsonData, schema, path)
+      
+      // Format the enhanced data
+      const enhancedFormattedJson = JSON.stringify(dataWithMissingFields, null, 2)
+      
+      return enhancedFormattedJson
+    } catch (error) {
+      return JSON.stringify(jsonData, null, 2)
+    }
   }
 
   return (
@@ -950,17 +999,29 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
             disabled={!selectedSchema || !jsonInput.trim() || isValidating}
             style={{
               padding: '12px 24px',
-              background: 'rgba(255,255,255,0.1)',
-              border: '1px solid rgba(255,255,255,0.2)',
+              background: (!selectedSchema || !jsonInput.trim() || isValidating) 
+                ? 'rgba(255,255,255,0.05)' 
+                : 'linear-gradient(135deg, #4CAF50, #45a049)',
+              border: (!selectedSchema || !jsonInput.trim() || isValidating)
+                ? '1px solid rgba(255,255,255,0.1)'
+                : '1px solid #4CAF50',
               borderRadius: '12px',
-              color: 'var(--text)',
+              color: (!selectedSchema || !jsonInput.trim() || isValidating)
+                ? 'rgba(255,255,255,0.4)'
+                : 'white',
               fontSize: '14px',
               fontWeight: '600',
-              cursor: 'pointer',
+              cursor: (!selectedSchema || !jsonInput.trim() || isValidating) ? 'not-allowed' : 'pointer',
               fontFamily: 'Segoe UI, sans-serif',
-              width: '120px',
+              width: '160px',
               height: '44.89px',
-              textAlign: 'center'
+              marginRight: 'auto',
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.3s ease',
+              opacity: (!selectedSchema || !jsonInput.trim() || isValidating) ? 0.6 : 1
             }}
           >
             {isValidating ? 'בודק...' : 'בדוק תקינות'}
@@ -981,59 +1042,125 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
               fontFamily: 'Segoe UI, sans-serif',
               width: '120px',
               height: '44.89px',
-              textAlign: 'center'
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
             נקה הכל
           </button>
         </div>
 
-        {/* JSON Input */}
-        <div style={{ 
+        {/* JSON Input, Validation Results, and Errors Container */}
+        <div style={{
+          display: 'flex',
+          gap: '24px',
           width: '100%',
+          paddingBottom: '20px',
           margin: '0'
         }}>
-          <label style={{
-            display: 'block',
-            fontSize: '16px',
-            fontWeight: '600',
-            marginBottom: '8px',
-            color: 'var(--text)'
+          {/* JSON Input */}
+          <div style={{ 
+            width: '30%',
+            margin: '0'
           }}>
-            הדבק JSON כאן
-          </label>
-          <textarea
-            value={jsonInput}
-            onChange={(e) => setJsonInput(e.target.value)}
-            placeholder="הדבק כאן את קובץ ה-JSON שברצונך לבדוק..."
-            style={{
-              width: '100%',
-              minHeight: '400px',
-              padding: '16px',
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: '12px',
-              color: 'var(--text)',
-              fontSize: '14px',
-              fontFamily: 'Monaco, Menlo, "DejaVu Sans Mono", monospace',
-              outline: 'none',
-              resize: 'vertical',
-              lineHeight: '1.5',
-              height: '700px'
-            }}
-          />
-        </div>
+            
+            <textarea
+              value={jsonInput}
+              onChange={(e) => setJsonInput(e.target.value)}
+              onPaste={(e) => {
+                const pastedText = e.clipboardData.getData('text');
+                try {
+                  // First try to parse as-is
+                  const parsed = JSON.parse(pastedText);
+                  const formatted = JSON.stringify(parsed, null, 2);
+                  e.preventDefault();
+                  setJsonInput(formatted);
+                } catch (error) {
+                  // Try to fix common JSON issues and parse again
+                  try {
+                    let fixedJson = pastedText
+                      // Remove leading/trailing commas
+                      .replace(/,\s*}/g, '}')
+                      .replace(/,\s*]/g, ']')
+                      // Fix missing opening braces/brackets
+                      .replace(/^,\s*{/g, '{')
+                      .replace(/^,\s*\[/g, '[')
+                      // Fix quotes around numbers
+                      .replace(/"(\d+(?:\.\d+)?)"/g, '$1')
+                      // Fix malformed key-value pairs
+                      .replace(/}\s*:\s*"/g, ',"')
+                      .replace(/}\s*:\s*{/g, ',{')
+                      // Clean up multiple commas
+                      .replace(/,,+/g, ',')
+                      // Remove comma at start of line
+                      .replace(/^\s*,/gm, '')
+                      // Ensure proper structure
+                      .trim();
+                    
+                    // If it doesn't start with { or [, try to wrap it
+                    if (!fixedJson.startsWith('{') && !fixedJson.startsWith('[')) {
+                      fixedJson = '{' + fixedJson + '}';
+                    }
+                    
+                    const parsed = JSON.parse(fixedJson);
+                    const formatted = JSON.stringify(parsed, null, 2);
+                    e.preventDefault();
+                    setJsonInput(formatted);
+                  } catch (secondError) {
+                    // If still can't parse, let the default paste behavior happen
+                  }
+                }
+              }}
+              onKeyDown={(e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  try {
+                    const parsed = JSON.parse(jsonInput);
+                    const formatted = JSON.stringify(parsed, null, 2);
+                    setJsonInput(formatted);
+                  } catch (error) {
+                    // JSON is not valid, don't format
+                  }
+                }
+              }}
+              placeholder="הדבק כאן את קובץ ה-JSON שברצונך לבדוק..."
+              style={{
+                width: '100%',
+                minHeight: '400px',
+                padding: '16px',
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '12px',
+                color: 'var(--text)',
+                fontSize: '14px',
+                fontFamily: 'Monaco, Menlo, "DejaVu Sans Mono", monospace',
+                outline: 'none',
+                resize: 'none',
+                lineHeight: '1.5',
+                height: '700px',
+                direction: 'ltr',
+                textAlign: 'left',
+              }}
+            />
+          </div>
 
-        {/* Validation Results */}
-          {validationResult && (
-            <div style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: `1px solid ${validationResult.isValid ? 'rgba(76,175,80,0.4)' : 'rgba(244,67,54,0.4)'}`,
-              borderRadius: '12px',
-              width: '100%',
-              margin: '32px 0 0 0',
-              padding: '32px'
-            }}>
+          {/* Validation Results */}
+          <div style={{ width: '40%' }}>
+            {validationResult ? (
+              <div style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: `1px solid ${validationResult.isValid ? 'rgba(76,175,80,0.4)' : 'rgba(244,67,54,0.4)'}`,
+                borderRadius: '12px',
+                width: '100%',
+                margin: '0',
+                padding: '32px',
+                height: '700px',
+                overflow: 'auto',
+                direction: 'ltr',
+                textAlign: 'left'
+              }}>
             {/* Result Header */}
             <div style={{
               display: 'flex',
@@ -1059,75 +1186,149 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
               </h3>
             </div>
 
-            {/* Errors */}
-            {validationResult.errors.length > 0 && (
+            {/* JSON with Color-coded Fields */}
+            {validationResult && jsonInput.trim() && (
               <div style={{ marginBottom: '20px' }}>
                 <h4 style={{
                   fontSize: '16px',
                   fontWeight: '600',
-                  color: '#f44336',
+                  color: 'var(--text)',
                   margin: '0 0 12px 0'
                 }}>
-                  שגיאות ({validationResult.errors.length})
+                  JSON עם סימון שדות
                 </h4>
                 <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  maxHeight: '300px',
+                  background: 'rgba(0,0,0,0.3)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  fontFamily: 'Monaco, Menlo, "DejaVu Sans Mono", monospace',
+                  fontSize: '13px',
+                  lineHeight: '1.6',
+                  maxHeight: '400px',
                   overflowY: 'auto'
                 }}>
-                  {validationResult.errors.map((error, index) => (
-                    <div key={index} style={{
-                      background: 'rgba(244,67,54,0.1)',
-                      border: '1px solid rgba(244,67,54,0.3)',
-                      borderRadius: '8px',
-                      padding: '12px',
-                      fontSize: '14px'
-                    }}>
+                  <pre key={`json-display-${validationSnapshot ? 'snapshot' : 'empty'}`} style={{
+                    margin: 0,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    fontFamily: 'Monaco, Menlo, "DejaVu Sans Mono", monospace',
+                    fontSize: '13px',
+                    lineHeight: '1.6'
+                  }}>
+                    {validationResult ? (() => {
+                      try {
+                        const jsonData = JSON.parse(validationSnapshot)
+                        const schema = availableSchemas[selectedSchema as keyof typeof availableSchemas]?.schema
+                        const formattedJson = renderJsonWithHighlights(jsonData, validationResult?.errors || [], schema)
+                        
+                        // Split into lines and add highlighting
+                        return formattedJson.split('\n').map((line: string, lineIndex: number) => {
+                          let highlightedLine = line
+                          
+                          // FIRST: Highlight missing fields (yellow background) - capture entire field including closing quote
+                          if (line.includes('[שדה חסר]')) {
+                            const originalLine = highlightedLine
+                            
+                            // Use the working pattern (Pattern 3)
+                            const pattern = /("[^"]+"\s*:\s*"[^"]*\[שדה חסר\][^"]*")/g
+                            
+                            if (pattern.test(highlightedLine)) {
+                              highlightedLine = highlightedLine.replace(
+                                pattern,
+                                '<span style="background: rgba(255,235,59,0.6); color: #333; padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(255,235,59,0.8); font-weight: 500;">$1</span>'
+                              )
+                            }
+                          }
+                          
+                          // SECOND: Highlight error fields (red background) - but skip if already highlighted as missing
+                          validationResult?.errors?.forEach(error => {
+                            const fieldName = error.path.split('.').pop()
+                            if (line.includes(`"${fieldName}"`) && !line.includes('[שדה חסר]')) {
+                              // Only highlight if it's NOT a missing field
+                              const keyValueRegex = new RegExp(`("${fieldName}"\\s*:\\s*[^,}\\]]*[",}])`, 'g')
+                              highlightedLine = highlightedLine.replace(
+                                keyValueRegex,
+                                '<span style="background: rgba(244,67,54,0.4); color: white; padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(244,67,54,0.6); font-weight: 500;">$1</span>'
+                              )
+                            }
+                          })
+                          
+                          return (
+                            <div key={lineIndex} dangerouslySetInnerHTML={{ __html: highlightedLine }} />
+                          )
+                        })
+                      } catch (error) {
+                        return (
+                          <span style={{ color: '#f44336' }}>
+                            JSON לא תקין: {error instanceof Error ? error.message : 'שגיאה לא ידועה'}
+                          </span>
+                        )
+                      }
+                    })() : (
+                      // Placeholder when no validation has been performed
                       <div style={{
-                        fontWeight: '600',
-                        color: '#f44336',
-                        marginBottom: '4px'
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '100%',
+                        textAlign: 'center',
+                        opacity: 0.6
                       }}>
-                        {error.path}
-                      </div>
-                      <div style={{
-                        color: 'var(--text)',
-                        marginBottom: '4px'
-                      }}>
-                        {error.message}
-                      </div>
-                      {error.suggestion && (
                         <div style={{
-                          fontSize: '13px',
-                          color: '#4caf50',
-                          background: 'rgba(76, 175, 80, 0.1)',
-                          border: '1px solid rgba(76, 175, 80, 0.3)',
-                          borderRadius: '4px',
-                          padding: '6px 8px',
-                          marginBottom: '6px',
-                          fontFamily: 'Segoe UI, sans-serif'
+                          fontSize: '48px',
+                          marginBottom: '20px',
+                          opacity: 0.6
                         }}>
-                          💡 {error.suggestion}
+                          🔍
                         </div>
-                      )}
-                      {error.value !== undefined && (
-                        <div style={{
-                          fontFamily: 'Monaco, monospace',
-                          fontSize: '12px',
+                        <h3 style={{
+                          fontSize: '20px',
+                          fontWeight: '600',
+                          color: 'var(--text)',
+                          margin: '0 0 12px 0'
+                        }}>
+                          תוצאת בדיקת תקינות
+                        </h3>
+                        <p style={{
+                          fontSize: '14px',
                           color: 'var(--muted)',
-                          background: 'rgba(0,0,0,0.3)',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          marginTop: '4px',
-                          wordBreak: 'break-all'
+                          margin: '0',
+                          lineHeight: '1.5',
+                          direction: 'rtl'
                         }}>
-                          ערך: {JSON.stringify(error.value)}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                          לחץ על "בדוק תקינות" כדי לראות את תוצאות הבדיקה עם סימון השדות
+                        </p>
+                      </div>
+                    )}
+                  </pre>
+                </div>
+                <div style={{
+                  marginTop: '18px',
+                  fontSize: '12px',
+                  color: 'var(--muted)',
+                  display: 'flex',
+                  gap: '16px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ 
+                      width: '12px', 
+                      height: '12px', 
+                      background: 'rgba(244,67,54,0.4)', 
+                      borderRadius: '2px' 
+                    }}></div>
+                    <span>שדות עם שגיאות</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ 
+                      width: '12px', 
+                      height: '12px', 
+                      background: 'rgba(255,235,59,0.6)', 
+                      borderRadius: '2px' 
+                    }}></div>
+                    <span>שדות חסרים</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -1157,48 +1358,178 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                 </div>
               </div>
             )}
-          </div>
-        )}
 
-        {/* Instructions */}
-        <div style={{
-          background: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: '12px',
-          width: '100%',
-          margin: '32px 0 0 0',
-          padding: '32px'
-        }}>
-          <h4 style={{
-            fontSize: '16px',
-            fontWeight: '600',
-            color: 'var(--accent)',
-            margin: '0 0 12px 0'
-          }}>
-            הוראות שימוש
-          </h4>
-          <div style={{
-            fontSize: '14px',
-            color: 'var(--text)',
-            lineHeight: '1.6'
-          }}>
-            <p style={{ margin: '0 0 8px 0' }}>
-              1. בחר תקן (סכמה) מהרשימה למעלה
-            </p>
-            <p style={{ margin: '0 0 8px 0' }}>
-              2. הדבק את קובץ ה-JSON שלך בתיבת הטקסט
-            </p>
-            <p style={{ margin: '0 0 8px 0' }}>
-              3. לחץ על "בדוק תקינות" כדי לבדוק את הקובץ
-            </p>
-            <p style={{ margin: '0 0 8px 0' }}>
-              4. אם יש שגיאות, הן יוצגו עם פירוט מדויק של הבעיה ומיקומה
-            </p>
-            <p style={{ margin: '0' }}>
-              5. אם הכל תקין, תקבל אישור שה-JSON עובר את הבדיקה בהצלחה
-            </p>
+              </div>
+            ) : (
+              /* Placeholder when no validation performed */
+              <div style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '12px',
+                width: '100%',
+                margin: '0',
+                padding: '32px',
+                height: '700px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                direction: 'ltr'
+              }}>
+                <div style={{
+                  fontSize: '48px',
+                  marginBottom: '20px',
+                  opacity: 0.6
+                }}>
+                  📋
+                </div>
+                <h3 style={{
+                  fontSize: '20px',
+                  fontWeight: '600',
+                  color: 'var(--text)',
+                  margin: '0 0 12px 0'
+                }}>
+                  תוצאות הבדיקה 
+                </h3>
+                <p style={{
+                  fontSize: '14px',
+                  color: 'var(--muted)',
+                  margin: '0 0 20px 0',
+                  lineHeight: '1.5',
+                  direction: 'rtl'
+                }}>
+                  הדבק קובץ JSON ולחץ על "בדוק תקינות" כדי לבדוק האם הדג"ח עומד בסכמה שנבחרה
+                </p>
+                
+              </div>
+            )}
+          </div>
+
+          {/* Errors Column */}
+          <div style={{ width: '30%' }}>
+            {validationResult && validationResult.errors.length > 0 ? (
+              <div style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(244,67,54,0.4)',
+                borderRadius: '12px',
+                width: '100%',
+                margin: '0',
+                marginTop: '0',
+                padding: '32px',
+                height: '700px',
+                overflow: 'auto'
+              }}>
+                {/* Errors Header */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '16px',
+                  paddingBottom: '12px',
+                  borderBottom: '1px solid rgba(255,255,255,0.1)'
+                }}>
+                  <span style={{
+                    fontSize: '24px',
+                    color: '#f44336'
+                  }}>
+                    ❌
+                  </span>
+                  <h3 style={{
+                    fontSize: '20px',
+                    fontWeight: '600',
+                    color: 'var(--text)',
+                    margin: 0
+                  }}>
+                    שגיאות ({validationResult.errors.length})
+                  </h3>
+                </div>
+
+                {/* Errors List */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  {validationResult.errors.map((error, index) => {
+                    const isMissingField = error.message.includes('שדה חובה חסר')
+                    const errorColor = isMissingField ? 'rgba(255,235,59,0.1)' : 'rgba(244,67,54,0.1)'
+                    const borderColor = isMissingField ? 'rgba(255,235,59,0.3)' : 'rgba(244,67,54,0.3)'
+                    const textColor = isMissingField ? '#ffc107' : '#f44336'
+                    
+                    return (
+                      <div key={index} style={{
+                        background: errorColor,
+                        border: `1px solid ${borderColor}`,
+                        borderRadius: '8px',
+                        padding: '12px',
+                        fontSize: '13px'
+                      }}>
+                        <div style={{
+                          fontWeight: '600',
+                          color: textColor,
+                          marginBottom: '4px',
+                          fontSize: '14px'
+                        }}>
+                          {error.path}
+                        </div>
+                        <div style={{
+                          color: textColor,
+                          fontSize: '12px',
+                          lineHeight: '1.4'
+                        }}>
+                          {isMissingField ? 'missing required field' : error.message.replace(/^[^:]+:\s*/, '')}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* Placeholder when no errors */
+              <div style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '12px',
+                width: '100%',
+                margin: '0',
+                marginTop: '0',
+                padding: '32px',
+                height: '700px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '48px',
+                  marginBottom: '20px',
+                  opacity: 0.6
+                }}>
+                  ✅
+                </div>
+                <h3 style={{
+                  fontSize: '20px',
+                  fontWeight: '600',
+                  color: 'var(--text)',
+                  margin: '0 0 12px 0'
+                }}>
+                  שגיאות
+                </h3>
+                <p style={{
+                  fontSize: '14px',
+                  color: 'var(--muted)',
+                  margin: '0',
+                  lineHeight: '1.5'
+                }}>
+                  {validationResult ? 'אין שגיאות' : 'בצע בדיקה כדי לראות שגיאות'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
+
 
       {/* Custom Scrollbar Styling */}
       <style>
