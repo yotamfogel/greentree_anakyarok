@@ -2,7 +2,7 @@
 
 @layer reset {
   *, *::before, *::after { box-sizing: border-box; }
-  html, body, #root { height: 100%; overflow: hidden; }
+  html, body, #root { height: 100%; overflow-x: auto; overflow-y: hidden; }
   body { margin: 0; font-family: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
 }
 
@@ -28,10 +28,12 @@
     color: var(--text);
     min-height: 100vh;
     width: 100vw;
-    display: grid;
-    place-items: start center;
-    padding: 24px;
-    overflow: hidden;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
   .app-shell { width: 100%; max-width: 1400px; display: grid; grid-template-rows: auto 1fr; gap: 12px; padding-top: 72px; }
   .app-header, .app-footer {
@@ -314,6 +316,7 @@
     gap: 12px;
     background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
     overflow-y: auto; /* allow vertical scrolling inside extractor */
+    overflow-x: hidden; /* prevent horizontal scrolling */
     overscroll-behavior: contain;
   }
   /* Hide scrollbars (while keeping scroll) specifically in Chrome/WebKit */

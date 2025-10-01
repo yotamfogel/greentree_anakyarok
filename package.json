@@ -12,11 +12,13 @@
     "@azure/msal-browser": "^4.24.0",
     "@azure/msal-react": "^3.0.20",
     "exceljs": "^4.4.0",
+    "pg": "^8.16.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/pg": "^8.15.5",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@vitejs/plugin-react": "^4.2.0",

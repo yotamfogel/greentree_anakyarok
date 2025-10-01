@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react'
 import { usePermissions } from './PermissionContext'
+import { getDatabaseService } from '../services/postgreSQLService'
+import { getDatabaseConfig } from '../config/databaseConfig'
 
 // Sagach data interfaces
 export interface SagachItem {
@@ -122,16 +124,20 @@ interface SagachDataContextType {
   addSagach: (sagach: Omit<SagachTable, 'createdBy' | 'createdAt' | 'lastModifiedBy' | 'lastModifiedAt'>) => void
   updateSagach: (id: string, updates: Partial<SagachTable>) => void
   deleteSagach: (id: string) => void
-  
+
   // Sagachim Status Data
   sagachimStatus: SagachimStatusItem[]
   addSagachimStatus: (item: Omit<SagachimStatusItem, 'createdBy' | 'createdAt' | 'lastModifiedBy' | 'lastModifiedAt'>) => void
   updateSagachimStatus: (id: string, updates: Partial<SagachimStatusItem>) => void
   deleteSagachimStatus: (id: string) => void
-  
+
   // Data management
   clearAllData: () => void
-  
+
+  // Database status
+  useDatabase: boolean
+  isDatabaseConnected: boolean
+
   // Real-time updates
   subscribeToChanges: (callback: (event: DataChangeEvent) => void) => () => void
   isLoading: boolean
@@ -160,6 +166,8 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [changeListeners, setChangeListeners] = useState<Set<(event: DataChangeEvent) => void>>(new Set())
+  const [dbService, setDbService] = useState<any>(null)
+  const [useDatabase, setUseDatabase] = useState(false)
 
   // Migration function to add missing fields to old data
   const migrateSagachData = (data: any[]): SagachTable[] => {
@@ -185,33 +193,61 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
   }
 
 
-  // Save data to shared storage
-  const saveData = useCallback((type: 'sagachs' | 'sagachimStatus', data: any) => {
+  // Save data to database (if available) and localStorage
+  const saveData = useCallback(async (type: 'sagachs' | 'sagachimStatus', data: any) => {
     try {
+      // Always save to localStorage as primary storage
       const key = type === 'sagachs' ? SAGACH_DATA_KEY : SAGACHIM_STATUS_KEY
       localStorage.setItem(key, JSON.stringify(data))
+
+      // If database is available, also save there (don't fail if it doesn't work)
+      if (useDatabase && dbService && dbService.isDatabaseConnected()) {
+        try {
+          if (type === 'sagachs') {
+            // Save each sagach individually to database
+            await Promise.all(data.map((sagach: SagachTable) => dbService.saveSagach(sagach)))
+          } else {
+            // Save each status item individually to database
+            await Promise.all(data.map((item: SagachimStatusItem) => dbService.saveSagachimStatus(item)))
+          }
+          console.log('💾 Data saved to PostgreSQL database')
+        } catch (dbError) {
+          console.error('❌ Failed to save to database, but localStorage saved successfully:', dbError)
+          // Don't set error state - localStorage save was successful
+        }
+      }
     } catch (err) {
       console.error('Failed to save shared data:', err)
       setError('Failed to save data')
     }
-  }, [])
+  }, [useDatabase, dbService])
 
   // Emit change event
-  const emitChange = useCallback((event: DataChangeEvent) => {
-    // Store the change event
+  const emitChange = useCallback(async (event: DataChangeEvent) => {
+    // Store the change event in localStorage
     try {
       const existingChanges = localStorage.getItem(DATA_CHANGES_KEY)
       const changes = existingChanges ? JSON.parse(existingChanges) : []
       changes.push(event)
-      
+
       // Keep only last 100 changes to prevent storage bloat
       if (changes.length > 100) {
         changes.splice(0, changes.length - 100)
       }
-      
+
       localStorage.setItem(DATA_CHANGES_KEY, JSON.stringify(changes))
     } catch (err) {
       console.error('Failed to store change event:', err)
+    }
+
+    // Log to database if available (don't fail if it doesn't work)
+    if (useDatabase && dbService && dbService.isDatabaseConnected() && user) {
+      try {
+        await dbService.logDataChange(event.type, event.data, event.userId, event.userName)
+      } catch (err) {
+        console.error('Failed to log change to database:', err)
+        // Don't set error state - this is just audit logging
+      }
     }
 
     // Notify all listeners
@@ -222,65 +258,120 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
         console.error('Error in change listener:', err)
       }
     })
-  }, [changeListeners])
+  }, [changeListeners, useDatabase, dbService, user])
 
-  // Load data on mount
+  // Initialize database connection and load data
   useEffect(() => {
-    const loadDataOnMount = () => {
+    const initializeAndLoadData = async () => {
       try {
         setIsLoading(true)
         setError(null)
 
-        // Load sagach data with migration
-        let sagachData = localStorage.getItem(SAGACH_DATA_KEY)
-        if (sagachData) {
-          const parsed = JSON.parse(sagachData)
-          setSagachs(parsed)
-        } else {
-          // Check for old localStorage keys and migrate data
-          const oldSagachData = localStorage.getItem(OLD_SAGACH_DATA_KEY)
-          if (oldSagachData) {
-            console.log('🔄 Migrating sagach data from old key...')
-            const parsed = JSON.parse(oldSagachData)
-            const migratedData = migrateSagachData(parsed)
-            setSagachs(migratedData)
-            // Save to new key
-            localStorage.setItem(SAGACH_DATA_KEY, JSON.stringify(migratedData))
-            // Remove old key
-            localStorage.removeItem(OLD_SAGACH_DATA_KEY)
-            console.log('✅ Sagach data migration completed')
+        // Initialize database service
+        const databaseService = getDatabaseService()
+        setDbService(databaseService)
+
+        // Try to connect to database and use it if available
+        let databaseAvailable = false
+        try {
+          await databaseService.initialize()
+          await databaseService.createTables()
+          databaseAvailable = true
+          setUseDatabase(true)
+          console.log('💾 Using PostgreSQL database for data storage')
+        } catch (dbError) {
+          console.warn('⚠️ PostgreSQL not available, falling back to localStorage:', dbError)
+          setUseDatabase(false)
+          databaseAvailable = false
+        }
+
+        // Load data based on availability
+        if (databaseAvailable && databaseService) {
+          try {
+            const [sagachData, statusData] = await Promise.all([
+              databaseService.loadSagachs(),
+              databaseService.loadSagachimStatus()
+            ])
+
+            setSagachs(sagachData)
+            setSagachimStatus(statusData)
+            console.log('✅ Data loaded from PostgreSQL database')
+          } catch (dbLoadError) {
+            console.error('❌ Failed to load from database, falling back to localStorage:', dbLoadError)
+            setUseDatabase(false)
+            // Fall through to localStorage loading
           }
         }
 
-        // Load sagachim status data with migration
-        let statusData = localStorage.getItem(SAGACHIM_STATUS_KEY)
-        if (statusData) {
-          const parsed = JSON.parse(statusData)
-          setSagachimStatus(parsed)
-        } else {
-          // Check for old localStorage keys and migrate data
-          const oldStatusData = localStorage.getItem(OLD_SAGACHIM_STATUS_KEY)
-          if (oldStatusData) {
-            console.log('🔄 Migrating status data from old key...')
-            const parsed = JSON.parse(oldStatusData)
-            const migratedData = migrateStatusData(parsed)
-            setSagachimStatus(migratedData)
-            // Save to new key
-            localStorage.setItem(SAGACHIM_STATUS_KEY, JSON.stringify(migratedData))
-            // Remove old key
-            localStorage.removeItem(OLD_SAGACHIM_STATUS_KEY)
-            console.log('✅ Status data migration completed')
+        // Always load from localStorage as fallback or primary source
+        if (!databaseAvailable || !useDatabase) {
+          // Load from localStorage with migration
+          let sagachData = localStorage.getItem(SAGACH_DATA_KEY)
+          if (sagachData) {
+            const parsed = JSON.parse(sagachData)
+            setSagachs(parsed)
+          } else {
+            // Check for old localStorage keys and migrate data
+            const oldSagachData = localStorage.getItem(OLD_SAGACH_DATA_KEY)
+            if (oldSagachData) {
+              console.log('🔄 Migrating sagach data from old key...')
+              const parsed = JSON.parse(oldSagachData)
+              const migratedData = migrateSagachData(parsed)
+              setSagachs(migratedData)
+              // Save to new key
+              localStorage.setItem(SAGACH_DATA_KEY, JSON.stringify(migratedData))
+              // Remove old key
+              localStorage.removeItem(OLD_SAGACH_DATA_KEY)
+              console.log('✅ Sagach data migration completed')
+            }
+          }
+
+          // Load sagachim status data with migration
+          let statusData = localStorage.getItem(SAGACHIM_STATUS_KEY)
+          if (statusData) {
+            const parsed = JSON.parse(statusData)
+            setSagachimStatus(parsed)
+          } else {
+            // Check for old localStorage keys and migrate data
+            const oldStatusData = localStorage.getItem(OLD_SAGACHIM_STATUS_KEY)
+            if (oldStatusData) {
+              console.log('🔄 Migrating status data from old key...')
+              const parsed = JSON.parse(oldStatusData)
+              const migratedData = migrateStatusData(parsed)
+              setSagachimStatus(migratedData)
+              // Save to new key
+              localStorage.setItem(SAGACHIM_STATUS_KEY, JSON.stringify(migratedData))
+              // Remove old key
+              localStorage.removeItem(OLD_SAGACHIM_STATUS_KEY)
+              console.log('✅ Status data migration completed')
+            }
+          }
+
+          if (databaseAvailable) {
+            console.log('💾 Using localStorage as primary storage (database available but loading failed)')
+          } else {
+            console.log('💾 Using localStorage as primary storage (database not available)')
           }
         }
       } catch (err) {
-        console.error('Failed to load shared data:', err)
+        console.error('Failed to initialize and load data:', err)
         setError('Failed to load data')
+        // Still try to load from localStorage as ultimate fallback
+        try {
+          const sagachData = localStorage.getItem(SAGACH_DATA_KEY)
+          const statusData = localStorage.getItem(SAGACHIM_STATUS_KEY)
+
+          if (sagachData) setSagachs(JSON.parse(sagachData))
+          if (statusData) setSagachimStatus(JSON.parse(statusData))
+        } catch (fallbackError) {
+          console.error('Even localStorage fallback failed:', fallbackError)
+        }
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadDataOnMount()
+    initializeAndLoadData()
   }, [])
 
 
@@ -370,7 +461,7 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
     })
   }, [user, saveData, emitChange])
 
-  const deleteSagach = useCallback((id: string) => {
+  const deleteSagach = useCallback(async (id: string) => {
     if (!user) {
       setError('User must be logged in to delete sagachs')
       return
@@ -383,6 +474,16 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
       return updated
     })
 
+    // Delete from database if available (don't fail if it doesn't work)
+    if (useDatabase && dbService && dbService.isDatabaseConnected()) {
+      try {
+        await dbService.deleteSagach(id)
+      } catch (err) {
+        console.error('Failed to delete sagach from database:', err)
+        // Don't set error state - localStorage deletion was successful
+      }
+    }
+
     emitChange({
       type: 'sagach_deleted',
       data: { id },
@@ -390,7 +491,7 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
       userId: user.id,
       userName: user.name
     })
-  }, [user, saveData, emitChange])
+  }, [user, saveData, emitChange, useDatabase, dbService])
 
   // Sagachim Status functions
   const addSagachimStatus = useCallback((itemData: Omit<SagachimStatusItem, 'createdBy' | 'createdAt' | 'lastModifiedBy' | 'lastModifiedAt'>) => {
@@ -454,7 +555,7 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
     })
   }, [user, saveData, emitChange])
 
-  const deleteSagachimStatus = useCallback((id: string) => {
+  const deleteSagachimStatus = useCallback(async (id: string) => {
     if (!user) {
       setError('User must be logged in to delete status items')
       return
@@ -467,6 +568,16 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
       return updated
     })
 
+    // Delete from database if available (don't fail if it doesn't work)
+    if (useDatabase && dbService && dbService.isDatabaseConnected()) {
+      try {
+        await dbService.deleteSagachimStatus(id)
+      } catch (err) {
+        console.error('Failed to delete status item from database:', err)
+        // Don't set error state - localStorage deletion was successful
+      }
+    }
+
     emitChange({
       type: 'status_deleted',
       data: { id },
@@ -474,7 +585,7 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
       userId: user.id,
       userName: user.name
     })
-  }, [user, saveData, emitChange])
+  }, [user, saveData, emitChange, useDatabase, dbService])
 
   // Clear all data
   const clearAllData = useCallback(() => {
@@ -523,6 +634,8 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
     updateSagachimStatus,
     deleteSagachimStatus,
     clearAllData,
+    useDatabase,
+    isDatabaseConnected: dbService?.isDatabaseConnected() || false,
     subscribeToChanges,
     isLoading,
     error
@@ -536,6 +649,8 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
     updateSagachimStatus,
     deleteSagachimStatus,
     clearAllData,
+    useDatabase,
+    dbService,
     subscribeToChanges,
     isLoading,
     error

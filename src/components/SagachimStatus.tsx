@@ -1744,13 +1744,19 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
       
       {/* Content */}
       <div className="sagachim-status" style={{
-        minHeight: '100vh',
+        minHeight: 'calc(100vh - 80px)',
         color: 'var(--text)',
         fontFamily: '"Segoe UI", system-ui, sans-serif',
-        width: '100%',
+        width: '100vw',
         boxSizing: 'border-box',
         padding: '20px',
-        position: 'relative'
+        position: 'fixed',
+        top: '80px',
+        left: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        zIndex: 1
       }}>
       <div style={{
         display: 'flex',
@@ -1766,6 +1772,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '40px',
+          marginTop: '20px',
+          marginLeft: '140px',
           width: '100%'
         }}>
           {/* Title Section */}
@@ -1774,7 +1782,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
             flex: 1
           }}>
             <h1 style={{
-              fontSize: '32px',
+              fontSize: '42px',
               fontWeight: '700',
               color: 'var(--accent)',
               margin: '0 0 16px 0',
@@ -1784,7 +1792,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
               סטטוס סג"חים
             </h1>
             <p style={{
-              fontSize: '16px',
+              fontSize: '20px',
               color: 'var(--muted)',
               margin: 0,
               direction: 'rtl'

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Workbook } from 'exceljs'
 
 function hexToARGB(hex: string): string {
@@ -44,85 +44,62 @@ export function ExcelExtractor() {
   const [editingField, setEditingField] = useState<{ id: string; field: 'fieldEssence' | 'dgh' | 'always' | 'notes' } | null>(null)
   const [editValue, setEditValue] = useState<string>('')
 
-  // Context menu state
-  const [contextMenu, setContextMenu] = useState<{
-    visible: boolean
-    x: number
-    y: number
-    fieldId: string
-  } | null>(null)
+  // Add state for original uploaded Excel data
+  const [originalExcelData, setOriginalExcelData] = useState<Array<{ name: string; type: string; essence: string; dgh: string; always: string; notes: string }>>([]);
 
-  // Function to handle cube color change
-  const handleColorChange = useCallback((fieldId: string, color: keyof typeof CUBE_COLORS) => {
-    setExcelFields(prev => prev.map(field => 
-      field.id === fieldId ? { ...field, color } : field
-    ))
-    setContextMenu(null)
-    
-    // Add animation class to the cube
-    const cubeElement = document.querySelector(`[data-field-id="${fieldId}"]`) as HTMLElement
-    if (cubeElement) {
-      cubeElement.classList.add('color-changed')
-      setTimeout(() => {
-        cubeElement.classList.remove('color-changed')
-      }, 600)
-    }
-    
-    // Show success feedback
-    const field = excelFields.find(f => f.id === fieldId)
-    if (field) {
-      const colorNames = {
-        default: 'Default Blue',
-        green: 'Green',
-        red: 'Red',
-        yellow: 'Yellow'
-      }
-      window.dispatchEvent(new CustomEvent('excel:status', { 
-        detail: { 
-          message: `Cube "${field.name}" color changed to ${colorNames[color]}`, 
-          type: 'ok', 
-          durationMs: 2000 
-        } 
-      }))
-    }
-  }, [excelFields])
 
-  // Function to handle right-click on cube
-  const handleCubeRightClick = useCallback((e: React.MouseEvent, fieldId: string) => {
-    e.preventDefault()
-    
-    // Calculate position to ensure menu stays on screen
-    const menuWidth = 140
-    const menuHeight = 200
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-    
-    let x = e.clientX
-    let y = e.clientY
-    
-    // Adjust X position if menu would go off right edge
-    if (x + menuWidth > viewportWidth) {
-      x = viewportWidth - menuWidth - 10
+  // Function to determine automatic cube color based on field content
+  const getAutomaticCubeColor = useCallback((field: any): keyof typeof CUBE_COLORS => {
+    // Check "האם יחזור תמיד?" field for positive indicators (green)
+    const alwaysValue = field.always || ''
+    const positiveIndicators = ['כן', 'yes', 'true', 'תמיד', 'always', 'חובה', 'required', 'חיובי', 'positive']
+    if (positiveIndicators.some(indicator => alwaysValue.toLowerCase().includes(indicator))) {
+      return 'green'
     }
-    
-    // Adjust Y position if menu would go off bottom edge
-    if (y + menuHeight > viewportHeight) {
-      y = viewportHeight - menuHeight - 10
+
+    // Check "האם יחזור תמיד?" field for negative indicators (red)
+    const negativeIndicators = ['לא', 'no', 'false', 'אף פעם', 'never', 'אופציונלי', 'optional', 'שלילי', 'negative']
+    if (negativeIndicators.some(indicator => alwaysValue.toLowerCase().includes(indicator))) {
+      return 'red'
     }
-    
-    setContextMenu({
-      visible: true,
-      x,
-      y,
-      fieldId
-    })
-  }, [excelFields])
+
+    // Check field essence for important keywords (green)
+    const essenceValue = field.fieldEssence || ''
+    const importantKeywords = ['מזהה', 'id', 'שם', 'name', 'תאריך', 'date', 'סכום', 'amount', 'חשוב', 'important', 'ראשי', 'primary']
+    if (importantKeywords.some(keyword => essenceValue.toLowerCase().includes(keyword))) {
+      return 'green'
+    }
+
+    // Check notes for warning keywords (yellow)
+    const notesValue = field.notes || ''
+    const warningKeywords = ['אזהרה', 'warning', 'שים לב', 'attention', 'חשוב', 'important']
+    if (warningKeywords.some(keyword => notesValue.toLowerCase().includes(keyword))) {
+      return 'yellow'
+    }
+
+    // Default to no special coloring
+    return 'default'
+  }, [])
 
   // Function to cancel editing
   const handleCancelEditing = useCallback(() => {
     setEditingField(null)
     setEditValue('')
   }, [])
+
+  // Filter to show only green cubes by default
+  const greenFields = useMemo(() => {
+    return excelFields.filter(field => {
+      const shouldBeGreen = getAutomaticCubeColor({
+        fieldEssence: field.fieldEssence || '',
+        always: field.always || '',
+        notes: field.notes || ''
+      }) === 'green'
+
+      // Include green fields and mapped fields
+      return shouldBeGreen || field.isMapped
+    })
+  }, [excelFields, getAutomaticCubeColor])
 
   // Function to handle saving edited field values
   const handleSaveFieldValue = useCallback((fieldId: string, fieldType: 'fieldEssence' | 'dgh' | 'always' | 'notes', newValue: string) => {
@@ -174,28 +151,6 @@ export function ExcelExtractor() {
     }
   }, [excelFields])
 
-  // Function to close context menu
-  const closeContextMenu = useCallback(() => {
-    setContextMenu(null)
-  }, [])
-
-  // Close context menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = () => closeContextMenu()
-    const handleEscapeKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeContextMenu()
-      }
-    }
-    
-    document.addEventListener('click', handleClickOutside)
-    document.addEventListener('keydown', handleEscapeKey)
-    
-    return () => {
-      document.removeEventListener('click', handleClickOutside)
-      document.removeEventListener('keydown', handleEscapeKey)
-    }
-  }, [closeContextMenu])
 
   const onDownloadTemplate = useCallback(async () => {
     try {
@@ -279,14 +234,14 @@ export function ExcelExtractor() {
     }
   }, [])
   
-  // Helper to compute full hierarchy label from a target node id (e.g., "a.b.c:42" -> "a -> b -> c")
-  const getFullHierarchyLabel = (targetNode?: { id?: string; name?: string; path?: string } | null): string => {
+  // Helper to compute full hierarchy label from a target node id (e.g., "a.b.c:42" -> "a -> b -> c" or "a.b.c")
+  const getFullHierarchyLabel = (targetNode?: { id?: string; name?: string; path?: string } | null, separator: string = ' -> '): string => {
     try {
       if (!targetNode) return ''
       // Prefer explicit path from imported mapping (e.g., "a.b.c")
       const explicitPath = (targetNode as any)?.path
       if (typeof explicitPath === 'string' && explicitPath.trim()) {
-        return explicitPath.trim().split('.').join(' -> ')
+        return explicitPath.trim().split('.').join(separator)
       }
       const rawId = String(targetNode.id || '').trim()
       if (!rawId) return targetNode.name || ''
@@ -294,7 +249,7 @@ export function ExcelExtractor() {
       if (!pathPart || pathPart === 'root') return targetNode.name || ''
       // If the id does not encode a hierarchy (no dots), prefer the actual node name
       if (!pathPart.includes('.')) return targetNode.name || ''
-      return pathPart.split('.').join(' -> ')
+      return pathPart.split('.').join(separator)
     } catch (e) {
       console.error('Failed to compute full hierarchy label for targetNode:', e, targetNode)
       return targetNode?.name || ''
@@ -366,10 +321,20 @@ export function ExcelExtractor() {
         })
       }
 
-      // Prefer current field cubes (excelFields) as the most up-to-date source
+      // Prefer current field cubes (excelFields) as the most up-to-date source - only green and mapped fields
       if (excelFields && excelFields.length > 0) {
-        const list = excelFields
-        list.forEach((f) => {
+        const filteredFields = excelFields.filter((f) => {
+          const shouldBeGreen = getAutomaticCubeColor({
+            fieldEssence: f.fieldEssence || '',
+            always: f.always || '',
+            notes: f.notes || ''
+          }) === 'green'
+
+          // Include green fields and mapped fields
+          return shouldBeGreen || f.isMapped
+        })
+
+        filteredFields.forEach((f) => {
           const matched = mappingByFieldKey.get(`${f.name}__${f.fieldType}`)
           const hasTarget = !!(matched && ((matched?.targetNode?.name && String(matched.targetNode.name).trim()) || (matched?.targetNode as any)?.path))
           const isMapped = !!hasTarget || !!f.isMapped
@@ -378,7 +343,7 @@ export function ExcelExtractor() {
             f.fieldEssence || '',            // מהות השדה
             f.fieldType || '',               // סוג שדה צד ספק
             f.dgh || '',                     // דג"ח
-            getFullHierarchyLabel(matched?.targetNode) || '', // שם השדה בתקן
+            getFullHierarchyLabel(matched?.targetNode, '.') || '', // שם השדה בתקן
             matched?.targetNode?.type || '', // סוג השדה בתקן
             matched?.targetNode?.rules ? matched.targetNode.rules.join(', ') : '', // חוקי השדה בתקן
             f.always || '',                  // האם יחזור תמיד
@@ -461,7 +426,7 @@ export function ExcelExtractor() {
             mapping.field.fieldEssence || '', // מהות השדה
             mapping.field.fieldType || '', // סוג שדה צד ספק
             mapping.field.dgh || '', // דג"ח
-            getFullHierarchyLabel(mapping.targetNode) || '', // שם השדה בתקן
+            getFullHierarchyLabel(mapping.targetNode, '.') || '', // שם השדה בתקן
             mapping.targetNode.type || '', // סוג השדה בתקן
             mapping.targetNode.rules ? mapping.targetNode.rules.join(', ') : '', // חוקי השדה בתקן
             mapping.field.always || '', // האם יחזור תמיד
@@ -533,6 +498,89 @@ export function ExcelExtractor() {
         }
       }
 
+      // Add original דגח data sheet if available
+      if (originalExcelData && originalExcelData.length > 0) {
+        const dghSheet = workbook.addWorksheet('דג"ח', {
+          views: [{ rightToLeft: true }]
+        })
+
+        // Headers for דגח sheet (same as template)
+        const dghHeaders = ['שם שדה', 'סוג שדה', 'מהות השדה', 'דג"ח', 'האם יחזור תמיד?', 'הערות']
+
+        // Column widths
+        dghHeaders.forEach((h, idx) => {
+          const col = dghSheet.getColumn(idx + 1)
+          col.width = Math.max(18, h.length + 2)
+          col.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+          ;(col as any).font = { name: fontName, size: fontSize }
+        })
+
+        // Header row for דגח sheet
+        dghSheet.addRow(dghHeaders)
+        const dghHeaderRow = dghSheet.getRow(1)
+        dghHeaderRow.height = 50
+        dghHeaderRow.eachCell((cell: any) => {
+          cell.font = {
+            name: fontName,
+            size: fontSize,
+            bold: true,
+            color: { argb: hexToARGB(headerTextColor) }
+          }
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: hexToARGB(headerBgColor) }
+          }
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          }
+          cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+        })
+
+        // Add original Excel data rows with coloring
+        originalExcelData.forEach((rowData) => {
+          const row = dghSheet.addRow([
+            rowData.name || '',
+            rowData.type || '',
+            rowData.essence || '',
+            rowData.dgh || '',
+            rowData.always || '',
+            rowData.notes || ''
+          ])
+
+          // Apply coloring based on field content (same logic as cubes)
+          const fieldColor = getAutomaticCubeColor({
+            fieldEssence: rowData.essence || '',
+            always: rowData.always || '',
+            notes: rowData.notes || ''
+          })
+
+          dghHeaders.forEach((_, cIdx) => {
+            const cell = row.getCell(cIdx + 1)
+            cell.font = { name: fontName, size: fontSize }
+            cell.border = {
+              top: { style: 'thin' },
+              left: { style: 'thin' },
+              bottom: { style: 'thin' },
+              right: { style: 'thin' }
+            }
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+
+            // Apply background color based on field content
+            if (fieldColor !== 'default') {
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: hexToARGB(CUBE_COLORS[fieldColor].bg) }
+              }
+            }
+          })
+        })
+      }
+
       // Embed selected schema key in a hidden meta sheet for later import
       if (schemaKey) {
         const metaSheet = workbook.addWorksheet('__meta')
@@ -546,7 +594,7 @@ export function ExcelExtractor() {
       console.error('Failed to generate mapping workbook:', err)
       throw err
     }
-  }, [excelFields])
+  }, [excelFields, originalExcelData])
 
   const onDownloadMapping = useCallback(async () => {
     try {
@@ -735,8 +783,16 @@ export function ExcelExtractor() {
           if (targetName || mappingDetails || outputs) {
             existing.isMapped = true
             existing.mappedTargetLabel = getFullHierarchyLabel({ id: '', name: targetName, path: targetPath }) || ''
-            // preserve explicit tint if present
-            existing.color = isRowYellow ? 'yellow' : (isRowRed ? 'red' : existing.color || 'green')
+            // preserve explicit tint if present, otherwise use automatic coloring
+            if (!isRowYellow && !isRowRed) {
+              existing.color = getAutomaticCubeColor({
+                fieldEssence: existing.fieldEssence || '',
+                always: existing.always || '',
+                notes: existing.notes || ''
+              })
+            } else {
+              existing.color = isRowYellow ? 'yellow' : 'red'
+            }
           } else if (isRowYellow || isRowRed) {
             // Allow yellow highlighting even if not mapped
             existing.color = isRowYellow ? 'yellow' : 'red'
@@ -754,7 +810,11 @@ export function ExcelExtractor() {
             expanded: false,
             isMapped: !!(targetName || mappingDetails || outputs),
             mappedTargetLabel: (targetName || mappingDetails || outputs) ? (getFullHierarchyLabel({ id: '', name: targetName, path: targetPath }) || '') : undefined,
-            color: isRowYellow ? 'yellow' : (isRowRed ? 'red' : ((targetName || mappingDetails || outputs) ? 'green' : 'default'))
+            color: isRowYellow ? 'yellow' : (isRowRed ? 'red' : getAutomaticCubeColor({
+              fieldEssence: essence || '',
+              always: always || '',
+              notes: notes || ''
+            }))
           })
         }
 
@@ -822,10 +882,13 @@ export function ExcelExtractor() {
         rows.push({ name, type, essence, dgh, always, notes })
       }
 
+      // Store the original Excel data for later use in mapping export
+      setOriginalExcelData(rows)
+
       // Local excel fields list for the extractor panel
       const localFields: Array<{ id: string; name: string; fieldType: string; fieldEssence: string; dgh: string; always: string; notes: string; expanded?: boolean; color?: keyof typeof CUBE_COLORS }> = []
       rows.forEach((row, idx) => {
-        localFields.push({
+        const fieldData = {
           id: `excel-${idx + 1}`,
           name: row.name || `Field_${idx + 1}`,
           fieldType: row.type || '',
@@ -834,8 +897,13 @@ export function ExcelExtractor() {
           always: row.always || '',
           notes: row.notes || '',
           expanded: false,
-          color: 'default'
-        })
+          color: getAutomaticCubeColor({
+            fieldEssence: row.essence || '',
+            always: row.always || '',
+            notes: row.notes || ''
+          }) as keyof typeof CUBE_COLORS
+        }
+        localFields.push(fieldData)
       })
       setExcelFields(localFields)
 
@@ -876,9 +944,9 @@ export function ExcelExtractor() {
   const clearExtractor = useCallback(() => {
     try {
       setExcelFields([])
+      setOriginalExcelData([])
       setEditingField(null)
       setEditValue('')
-      setContextMenu(null)
       if (dragImageRef.current) {
         try { dragImageRef.current.remove() } catch {}
         dragImageRef.current = null
@@ -965,17 +1033,16 @@ export function ExcelExtractor() {
           <div className="fridge-divider" />
           
           {/* Excel Fields displayed at the top */}
-          {excelFields.length > 0 && (
+          {greenFields.length > 0 && (
             <div className="excel-fields" onDragOver={(e) => { e.preventDefault() }}>
               <div className="excel-fields-list">
-                {excelFields.map((f, idx) => (
+                {greenFields.map((f, idx) => (
                   <div
                     key={f.id}
                     data-field-id={f.id}
                     data-color={f.color}
                     className={`excel-cube ${f.expanded ? 'open' : ''} ${f.isMapped ? 'mapped' : ''} ${editingField?.id === f.id ? 'editing' : ''}`}
                     draggable
-                    title="Right-click to change color"
                     style={{
                       background: f.isMapped ? undefined : (f.color ? CUBE_COLORS[f.color].bg : CUBE_COLORS.default.bg),
                       boxShadow: f.isMapped ? undefined : '0 4px 12px rgba(0,0,0,0.2)'
@@ -1028,17 +1095,14 @@ export function ExcelExtractor() {
                       // Check if the click is on an editable field
                       const target = e.target as HTMLElement
                       const isEditableField = target.closest('.editable-field') || target.closest('input') || target.closest('textarea')
-                      
+
                       // If clicking on an editable field, don't toggle the cube
                       if (isEditableField) {
                         e.stopPropagation()
                         return
                       }
-                      
+
                       setExcelFields((prev) => prev.map((x, i) => i === idx ? { ...x, expanded: !x.expanded } : x))
-                    }}
-                    onContextMenu={(e) => {
-                      handleCubeRightClick(e, f.id)
                     }}
                   >
                     <div className="excel-cube-head" style={{ position: 'relative' }}>
@@ -1123,8 +1187,8 @@ export function ExcelExtractor() {
                             }}
                           />
                         ) : (
-                          <span 
-                            className="v editable-field" 
+                          <span
+                            className="v editable-field"
                             onDoubleClick={(e) => {
                               e.stopPropagation()
                               setEditingField({ id: f.id, field: 'fieldEssence' })
@@ -1203,8 +1267,8 @@ export function ExcelExtractor() {
                             }}
                           />
                         ) : (
-                          <span 
-                            className="v editable-field" 
+                          <span
+                            className="v editable-field"
                             onDoubleClick={(e) => {
                               e.stopPropagation()
                               setEditingField({ id: f.id, field: 'dgh' })
@@ -1283,8 +1347,8 @@ export function ExcelExtractor() {
                             }}
                           />
                         ) : (
-                          <span 
-                            className="v editable-field" 
+                          <span
+                            className="v editable-field"
                             onDoubleClick={(e) => {
                               e.stopPropagation()
                               setEditingField({ id: f.id, field: 'always' })
@@ -1363,8 +1427,8 @@ export function ExcelExtractor() {
                             }}
                           />
                         ) : (
-                          <span 
-                            className="v editable-field" 
+                          <span
+                            className="v editable-field"
                             onDoubleClick={(e) => {
                               e.stopPropagation()
                               setEditingField({ id: f.id, field: 'notes' })
@@ -1407,86 +1471,6 @@ export function ExcelExtractor() {
             </div>
           )}
           
-          {/* Context Menu for Cube Color Selection */}
-          {contextMenu && (
-            <div 
-              className="cube-context-menu"
-              style={{
-                position: 'fixed',
-                top: contextMenu.y,
-                left: contextMenu.x,
-                zIndex: 1000,
-                backgroundColor: '#2a2a2a',
-                border: '1px solid #444',
-                borderRadius: '8px',
-                padding: '8px 0',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                minWidth: '120px'
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="context-menu-title" style={{ padding: '8px 16px', fontSize: '12px', color: '#888', borderBottom: '1px solid #444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Change Cube Color</span>
-                <button
-                  onClick={closeContextMenu}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#888',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    padding: '2px',
-                    borderRadius: '3px',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#444'
-                    e.currentTarget.style.color = '#fff'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                    e.currentTarget.style.color = '#888'
-                  }}
-                  title="Close"
-                >
-                  ✕
-                </button>
-              </div>
-              {Object.entries(CUBE_COLORS).filter(([colorKey]) => colorKey !== 'green').map(([colorKey, colorData]) => (
-                <div
-                  key={colorKey}
-                  className="color-option"
-                  onClick={() => handleColorChange(contextMenu.fieldId, colorKey as keyof typeof CUBE_COLORS)}
-                  style={{
-                    padding: '8px 16px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    color: '#fff',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#444'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }}
-                >
-                  <div
-                    className="color-preview"
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '3px',
-                      background: colorKey === 'default' ? 'linear-gradient(180deg, rgba(124,192,255,0.6), rgba(124,192,255,0.3))' : colorData.bg
-                    }}
-                  />
-                  <span style={{ textTransform: 'capitalize' }}>{colorKey}</span>
-                </div>
-              ))}
-            </div>
-          )}
           
         <div className="excel-actions">
           <input
@@ -1511,34 +1495,40 @@ export function ExcelExtractor() {
               if (mappingFileInputRef.current) mappingFileInputRef.current.value = ''
             }}
           />
-          {excelFields.filter(f => f.isMapped).length > 0 && (
+          {greenFields.filter(f => f.isMapped).length > 0 && (
             <div className="mappings-count">
-              {excelFields.filter(f => f.isMapped).length} mapping{excelFields.filter(f => f.isMapped).length !== 1 ? 's' : ''} saved
+              {greenFields.filter(f => f.isMapped).length} mapping{greenFields.filter(f => f.isMapped).length !== 1 ? 's' : ''} saved
             </div>
           )}
         </div>
         <div className="fridge-note">
-          {excelFields.length === 0 
-            ? 'הורידו את הפורמט, מלאו אותו בדג"ח מהספק והעלו אותו לפירוק!'
+          {greenFields.length === 0
+            ? excelFields.length > 0
+              ? 'אין שדות ירוקים או ממופים להצגה מתוך השדות שהועלו.'
+              : 'הורידו את הפורמט, מלאו אותו בדג"ח מהספק והעלו אותו לפירוק!'
             : 'גררו שדה מהדג"ח לשדה שמתאים לו מהתקן, הכניסו את הפרסר הרצוי ולחצו שמור. לאחר שסיימתם למפות את כל השדות הרלוונטים - לחצו על כפתור הורדת המאפינג ותיהנו!'
           }
         </div>
-        {excelFields.length === 0 && (
+        {greenFields.length === 0 && excelFields.length === 0 && (
           <div className="excel-cta"></div>
         )}
-        {/* Bottom-left clear button (trash) */}
-        {excelFields.length > 0 && (
-          <button
-            className="btn ghost extractor-clear-btn"
-            aria-label={'נקה את הדג"ח'}
-            title={'נקה את הדג"ח'}
-            onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); clearExtractor() }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 3c-.55 0-1 .45-1 1v1H5.5c-.28 0-.5.22-.5.5s.22.5.5.5H6v13c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6h.5c.28 0 .5-.22.5-.5s-.22-.5-.5-.5H16V4c0-.55-.45-1-1-1H9zm1 2V4h4v1h-4zm-2 2h10v12c0 .55-.45 1-1 1H8c-.55 0-1-.45-1-1V7zm3 2c-.28 0-.5.22-.5.5v7c0 .28.22.5.5.5s.5-.22.5-.5v-7c0-.28-.22-.5-.5-.5zm4 0c-.28 0-.5.22-.5.5v7c0 .28.22.5.5.5s.5-.22.5-.5v-7c0-.28-.22-.5-.5-.5z"/>
-            </svg>
-          </button>
-        )}
+
+        {/* Bottom area buttons */}
+        <div className="fridge-bottom-controls">
+          {/* Bottom-left clear button (trash) */}
+          {excelFields.length > 0 && (
+            <button
+              className="btn ghost extractor-clear-btn"
+              aria-label={'נקה את הדג"ח'}
+              title={'נקה את הדג"ח'}
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); clearExtractor() }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 3c-.55 0-1 .45-1 1v1H5.5c-.28 0-.5.22-.5.5s.22.5.5.5H6v13c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6h.5c.28 0 .5-.22.5-.5s-.22-.5-.5-.5H16V4c0-.55-.45-1-1-1H9zm1 2V4h4v1h-4zm-2 2h10v12c0 .55-.45 1-1 1H8c-.55 0-1-.45-1-1V7zm3 2c-.28 0-.5.22-.5.5v7c0 .28.22.5.5.5s.5-.22.5-.5v-7c0-.28-.22-.5-.5-.5zm4 0c-.28 0-.5.22-.5.5v7c0 .28.22.5.5.5s.5-.22.5-.5v-7c0-.28-.22-.5-.5-.5z"/>
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
     </aside>
   )

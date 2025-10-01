@@ -8,6 +8,7 @@ import { SagachimStatus } from './components/SagachimStatus'
 import { ValueList } from './components/ValueList'
 import { SagachimArchive } from './components/SagachimArchive'
 import { SagachimAnalytics } from './components/SagachimAnalytics'
+import { JsonSchemaValidator } from './components/JsonSchemaValidator'
 import { PermissionProvider } from './contexts/PermissionContext'
 import { SagachDataProvider } from './contexts/SagachDataContext'
 import { LoginModal } from './components/LoginModal'
@@ -160,7 +161,7 @@ function AppContent() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showPermissionManager, setShowPermissionManager] = useState(false)
   const [showArchiveAnalytics, setShowArchiveAnalytics] = useState(false)
-  const [activeScreen, setActiveScreen] = useState<'viz' | 'dictionary' | 'common' | 'status' | 'archive' | 'analytics'>('status')
+  const [activeScreen, setActiveScreen] = useState<'viz' | 'dictionary' | 'common' | 'status' | 'archive' | 'analytics' | 'validator'>('status')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [toastType, setToastType] = useState<ToastType>('ok')
   const [toastLeaving, setToastLeaving] = useState<boolean>(false)
@@ -1956,7 +1957,35 @@ function AppContent() {
                   >
                     סטטוס סג"חים
                   </div>
-                  
+
+                  <div
+                    className="schema-option"
+                    role="menuitem"
+                    onClick={() => {
+                      console.log('Clicking validator option')
+                      setActiveScreen('validator')
+                      setIsNavOpen(false)
+                      setIsUploadMenuOpen(false)
+                      setIsDownloadMenuOpen(false)
+                      setIsSchemaDropdownOpen(false)
+                    }}
+                    onMouseEnter={() => console.log('Hovering over validator option')}
+                    onMouseLeave={() => console.log('Leaving validator option')}
+                    style={{
+                      position: 'relative',
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid rgba(255,255,255,0.06)',
+                      transition: 'background 0.2s ease',
+                      fontSize: '14px',
+                      color: '#ffffff',
+                      textAlign: 'center',
+                      pointerEvents: 'auto',
+                      zIndex: 9999999
+                    }}
+                  >
+                    בודק תקינות JSON
+                  </div>
 
                 </div>
               )}
@@ -2039,6 +2068,8 @@ function AppContent() {
           <SagachimArchive onBack={() => setActiveScreen('status')} />
         ) : activeScreen === 'analytics' ? (
           <SagachimAnalytics />
+        ) : activeScreen === 'validator' ? (
+          <JsonSchemaValidator onBack={() => setActiveScreen('status')} />
         ) : user && user.role !== 'admin' ? (
           <div style={{
             display: 'flex',
