@@ -311,15 +311,13 @@ export const SagachAnalyticsModal = ({ isOpen, onClose, sagach }: SagachAnalytic
         background: 'var(--panel)',
         borderRadius: '20px',
         width: '100%',
-        maxWidth: '1400px',
+        maxWidth: '1200px',
         maxHeight: '90vh',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
         overflow: 'hidden',
         boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-        backdropFilter: 'blur(20px)',
-        margin: '0 auto'
+        backdropFilter: 'blur(20px)'
       }}>
         {/* Header */}
         <div style={{

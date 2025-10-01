@@ -1502,8 +1502,8 @@ function AppContent() {
             {/* Status Screen Buttons */}
             {activeScreen === 'status' && (
               <div className="status-controls" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginRight: '16px' }}>
-                <button 
-                  className="btn glow-blue"
+                <button
+                  className="btn glow-green"
                   onClick={() => setActiveScreen('archive')}
                   style={{
                     padding: '12px 16px',
@@ -1522,8 +1522,8 @@ function AppContent() {
                   </svg>
                   ארכיון
                 </button>
-                <button 
-                  className="btn glow-green"
+                <button
+                  className="btn glow-orange"
                   onClick={() => setActiveScreen('analytics')}
                   style={{
                     padding: '12px 16px',

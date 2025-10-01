@@ -480,18 +480,19 @@ export const SagachimAnalytics = () => {
         flexDirection: 'column',
         alignItems: 'center',
         marginBottom: '32px',
+        marginTop: '20px',
         padding: '16px 0',
         borderBottom: '1px solid rgba(255,255,255,0.1)'
       }}>
         <span style={{
-          fontSize: '32px',
+          fontSize: '40px',
           fontWeight: '700',
-          color: 'var(--text)',
-          margin: '0 0 8px 0',
+          color: 'rgb(233, 159, 49)',
+          margin: '0 0 14px 0',
           textAlign: 'center'
         }}>אנליטיקות - הכנסות סג"חים</span>
         <span style={{
-          fontSize: '16px',
+          fontSize: '20px',
           color: 'var(--muted)',
           margin: '0 0 16px 0',
           textAlign: 'center'

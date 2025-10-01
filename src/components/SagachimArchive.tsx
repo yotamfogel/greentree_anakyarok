@@ -437,19 +437,19 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
         flexDirection: 'column',
         alignItems: 'center',
         marginBottom: '32px',
-        marginTop: '14px',
+        marginTop: '20px',
         padding: '16px 0',
         borderBottom: '1px solid rgba(255,255,255,0.1)'
       }}>
         <span style={{
-          fontSize: '28px',
+          fontSize: '42px',
           fontWeight: '700',
-          color: 'var(--text)',
+          color: 'rgb(61, 194, 43)',
           margin: '0 0 14px 0',
           textAlign: 'center'
         }}>ארכיון - סג"חים מובצעים</span>
         <span style={{
-          fontSize: '16px',
+          fontSize: '20px',
           color: 'var(--muted)',
           margin: '0 0 20px 0',
           textAlign: 'center'
@@ -459,7 +459,7 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
           color: 'var(--muted)',
           margin: '0 0 12px 0',
           textAlign: 'center'
-        }}>מוצגים {filteredData.length} מתוך {completedSagachim.length} סגחים</span>
+        }}>מוצגים {filteredData.length} מתוך {completedSagachim.length} סג"חים</span>
         
       </div>
         
