@@ -839,7 +839,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
             width: '100%'
           }}>
             <h1 style={{
-              fontSize: '32px',
+              fontSize: '40px',
               fontWeight: '700',
               color: 'var(--accent)',
               margin: '0 0 8px 0',
@@ -853,7 +853,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
               margin: 0,
               textAlign: 'center'
             }}>
-              בדוק אם הדג"ח שלך עובר את התקן של הענק
+              בדוק אם הדג"ח שלך עומד בתקן הענק
             </p>
           </div>
         </div>
@@ -872,10 +872,11 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
             <label style={{
               display: 'block',
               fontSize: '16px',
-              fontWeight: '600',
+              fontWeight: '400',
               marginBottom: '8px',
               color: 'var(--text)'
             }}>
+              בחר תקן, הכנס דג"ח JSON ולחץ על כפתור "בדוק תקינות" בשביל לבדוק האם הדג"ח שלך עומד בסכמה
             </label>
             <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
               <button
@@ -911,6 +912,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                   (e.target as HTMLButtonElement).style.transform = 'translateY(0px)'
                 }}
               >
+                
                 <span>{selectedSchema ? availableSchemas[selectedSchema as keyof typeof availableSchemas]?.title : 'בחר תקן...'}</span>
                 <span style={{ marginLeft: '8px' }}>▼</span>
               </button>

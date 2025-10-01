@@ -1797,7 +1797,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
               margin: 0,
               direction: 'rtl'
             }}>
-              מעקב אחר מצב הסג"חים בתהליך הכניסה
+              עקוב אחרי מצב הסג"חים בתהליך הכניסה לענק הירוק
             </p>
           </div>
 
