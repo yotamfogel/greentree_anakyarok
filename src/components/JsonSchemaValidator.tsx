@@ -28,6 +28,16 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
   const [isValidating, setIsValidating] = useState<boolean>(false)
   const [isSchemaDropdownOpen, setIsSchemaDropdownOpen] = useState<boolean>(false)
 
+  // Clear validation results when JSON input is cleared
+  const handleJsonInputChange = (value: string) => {
+    setJsonInput(value)
+    // If input is cleared, also clear validation results
+    if (!value.trim()) {
+      setValidationResult(null)
+      setValidationSnapshot('')
+    }
+  }
+
   // Extract available schemas from the hardcoded data in App.tsx
   const availableSchemas = useMemo(() => ({
     'gps_location': {
@@ -935,6 +945,8 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                   <div
                     onClick={() => {
                       setSelectedSchema('')
+                      setValidationResult(null)
+                      setValidationSnapshot('')
                       setIsSchemaDropdownOpen(false)
                     }}
                     style={{
@@ -963,6 +975,8 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                       key={key}
                       onClick={() => {
                         setSelectedSchema(key)
+                        setValidationResult(null)
+                        setValidationSnapshot('')
                         setIsSchemaDropdownOpen(false)
                       }}
                       style={{
@@ -1070,7 +1084,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
             
             <textarea
               value={jsonInput}
-              onChange={(e) => setJsonInput(e.target.value)}
+              onChange={(e) => handleJsonInputChange(e.target.value)}
               onPaste={(e) => {
                 const pastedText = e.clipboardData.getData('text');
                 try {
@@ -1078,7 +1092,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                   const parsed = JSON.parse(pastedText);
                   const formatted = JSON.stringify(parsed, null, 2);
                   e.preventDefault();
-                  setJsonInput(formatted);
+                  handleJsonInputChange(formatted);
                 } catch (error) {
                   // Try to fix common JSON issues and parse again
                   try {
@@ -1109,7 +1123,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                     const parsed = JSON.parse(fixedJson);
                     const formatted = JSON.stringify(parsed, null, 2);
                     e.preventDefault();
-                    setJsonInput(formatted);
+                    handleJsonInputChange(formatted);
                   } catch (secondError) {
                     // If still can't parse, let the default paste behavior happen
                   }
@@ -1121,7 +1135,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                   try {
                     const parsed = JSON.parse(jsonInput);
                     const formatted = JSON.stringify(parsed, null, 2);
-                    setJsonInput(formatted);
+                    handleJsonInputChange(formatted);
                   } catch (error) {
                     // JSON is not valid, don't format
                   }

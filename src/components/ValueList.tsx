@@ -345,7 +345,8 @@ export function ValueList({ schemas }: ValueListProps) {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'flex-start',
-        textAlign: 'center'
+        textAlign: 'center',
+        zIndex: 1
       }}>
         <div 
           className="value-detail-headline" 
