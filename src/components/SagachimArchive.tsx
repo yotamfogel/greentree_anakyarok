@@ -377,36 +377,59 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
   }
 
   return (
-    <main className="app-main" style={{display: 'flex', flexDirection: 'column', direction: 'rtl', fontFamily: 'Segoe UI, sans-serif', height: '100vh', overflow: 'hidden', width: '100%' }}>
-      {/* Custom Scrollbar Styles */}
-      <style>
-        {`
-          .archive-scroll::-webkit-scrollbar {
-            width: 8px;
-          }
-          
-          .archive-scroll::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-          }
-          
-          .archive-scroll::-webkit-scrollbar-thumb {
-            background: rgba(76, 175, 80, 0.6);
-            border-radius: 4px;
-            transition: background 0.3s ease;
-          }
-          
-          .archive-scroll::-webkit-scrollbar-thumb:hover {
-            background: rgba(76, 175, 80, 0.8);
-          }
-          
-          /* For Firefox */
-          .archive-scroll {
-            scrollbar-width: thin;
-            scrollbar-color: rgba(76, 175, 80, 0.6) rgba(255, 255, 255, 0.1);
-          }
-        `}
-      </style>
+    <div style={{
+      position: 'fixed',
+      top: '80px',
+      left: 0,
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'flex-start',
+      zIndex: 1,
+      height: 'calc(100vh - 80px)',
+      width: '100%',
+      overflow: 'hidden'
+    }}>
+      <main className="app-main" style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        maxWidth: '1400px',
+        margin: '0 auto',
+        width: '100%',
+        height: '100%',
+        direction: 'rtl',
+        fontFamily: 'Segoe UI, sans-serif',
+        overflow: 'hidden'
+      }}>
+        {/* Custom Scrollbar Styles */}
+        <style>
+          {`
+            .archive-scroll::-webkit-scrollbar {
+              width: 8px;
+            }
+
+            .archive-scroll::-webkit-scrollbar-track {
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 4px;
+            }
+
+            .archive-scroll::-webkit-scrollbar-thumb {
+              background: rgba(76, 175, 80, 0.6);
+              border-radius: 4px;
+              transition: background 0.3s ease;
+            }
+
+            .archive-scroll::-webkit-scrollbar-thumb:hover {
+              background: rgba(76, 175, 80, 0.8);
+            }
+
+            /* For Firefox */
+            .archive-scroll {
+              scrollbar-width: thin;
+              scrollbar-color: rgba(76, 175, 80, 0.6) rgba(255, 255, 255, 0.1);
+            }
+          `}
+        </style>
 
       {/* Title Section */}
       <div style={{
@@ -414,6 +437,7 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
         flexDirection: 'column',
         alignItems: 'center',
         marginBottom: '32px',
+        marginTop: '14px',
         padding: '16px 0',
         borderBottom: '1px solid rgba(255,255,255,0.1)'
       }}>
@@ -421,7 +445,7 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
           fontSize: '28px',
           fontWeight: '700',
           color: 'var(--text)',
-          margin: '0 0 8px 0',
+          margin: '0 0 14px 0',
           textAlign: 'center'
         }}>ארכיון - סג"חים מובצעים</span>
         <span style={{
@@ -1148,15 +1172,16 @@ export const SagachimArchive = ({ onBack }: SagachimArchiveProps) => {
       )}
       </div>
 
-      {/* Analytics Modal */}
-      <SagachAnalyticsModal
-        isOpen={isAnalyticsModalOpen}
-        onClose={() => {
-          setIsAnalyticsModalOpen(false)
-          setSelectedSagach(null)
-        }}
-        sagach={selectedSagach}
-      />
-    </main>
+        {/* Analytics Modal */}
+        <SagachAnalyticsModal
+          isOpen={isAnalyticsModalOpen}
+          onClose={() => {
+            setIsAnalyticsModalOpen(false)
+            setSelectedSagach(null)
+          }}
+          sagach={selectedSagach}
+        />
+      </main>
+    </div>
   )
 }

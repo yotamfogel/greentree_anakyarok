@@ -413,43 +413,63 @@ export const SagachimAnalytics = () => {
   const analytics = calculateAnalytics()
 
   return (
-    <main className="app-main" style={{
-      display: 'flex', 
-      flexDirection: 'column', 
-      direction: 'rtl', 
-      fontFamily: 'Segoe UI, sans-serif', 
-      height: '100vh', 
-      overflow: 'auto', 
+    <div style={{
+      position: 'fixed',
+      top: '80px',
+      left: 0,
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'flex-start',
+      zIndex: 1,
+      height: 'calc(100vh - 80px)',
       width: '100%',
-      padding: '20px'
+      overflow: 'auto',
+      direction: 'rtl'
     }}>
+      <main className="app-main" style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        maxWidth: '1400px',
+        margin: '0 auto',
+        width: '100%',
+        height: 'auto',
+        direction: 'rtl',
+        fontFamily: 'Segoe UI, sans-serif',
+        overflow: 'auto'
+      }}>
       
       {/* Custom Scrollbar Styles */}
       <style>
         {`
-          .analytics-scroll::-webkit-scrollbar {
+          .app-main::-webkit-scrollbar {
             width: 8px;
           }
-          
-          .analytics-scroll::-webkit-scrollbar-track {
+
+          .app-main::-webkit-scrollbar-track {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 4px;
           }
-          
-          .analytics-scroll::-webkit-scrollbar-thumb {
+
+          .app-main::-webkit-scrollbar-thumb {
             background: rgba(76, 175, 80, 0.6);
             border-radius: 4px;
             transition: background 0.3s ease;
           }
-          
-          .analytics-scroll::-webkit-scrollbar-thumb:hover {
+
+          .app-main::-webkit-scrollbar-thumb:hover {
             background: rgba(76, 175, 80, 0.8);
           }
-          
+
           /* For Firefox */
-          .analytics-scroll {
+          .app-main {
             scrollbar-width: thin;
             scrollbar-color: rgba(76, 175, 80, 0.6) rgba(255, 255, 255, 0.1);
+          }
+
+          /* Ensure proper RTL layout for scrollbar positioning */
+          .app-main {
+            direction: rtl;
           }
         `}
       </style>
@@ -728,8 +748,6 @@ export const SagachimAnalytics = () => {
         justifyContent: 'center',
         gap: '24px',
         width: '100%',
-        maxHeight: 'calc(100vh - 300px)',
-        overflowY: 'auto',
         padding: '0 20px'
       }}>
         
@@ -740,8 +758,7 @@ export const SagachimAnalytics = () => {
             maxWidth: '320px',
             height: 'fit-content',
             textAlign: 'right',
-            direction: 'rtl',
-            marginLeft: '120px'
+            direction: 'rtl'
           }}>
             
             
@@ -808,7 +825,7 @@ export const SagachimAnalytics = () => {
             maxWidth: '500px',
             height: 'fit-content',
             textAlign: 'right',
-            direction: 'rtl'
+            direction: 'rtl',
           }}>
             <div style={{
               fontSize: '28px',
@@ -889,6 +906,7 @@ export const SagachimAnalytics = () => {
         </div>
       </div>
 
-    </main>
+      </main>
+    </div>
   )
 }

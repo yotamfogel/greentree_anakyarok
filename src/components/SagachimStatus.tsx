@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react'
 import { usePermissions } from '../contexts/PermissionContext'
-import { useSagachData, ARENA_OPTIONS, type ArenaOption, type PhaseEntry, type PhaseData } from '../contexts/SagachDataContext'
+import { useSagachData, ARENA_OPTIONS, type ArenaOption, type PhaseEntry, type PhaseData, type SagachimStatusItem, type NotificationSubscriber, type FileAttachment } from '../contexts/SagachDataContext'
 
 // Custom date formatting function to use '/' instead of '.'
 const formatDateWithSlashes = (date: Date): string => {
@@ -56,49 +56,8 @@ const PROVIDER_OPTIONS = [
 
 type ProviderOption = typeof PROVIDER_OPTIONS[number]
 
-interface FileAttachment {
-  id: string
-  name: string
-  size: number
-  type: string
-  uploadDate: string
-  url?: string // For downloaded files or file references
-  data?: string // Base64 data for small files or file content
-}
 
-interface SagachimStatusItem {
-  id: string
-  name: string
-  description: string
-  provider: string
-  lastUpdated: string
-  arena: ArenaOption[] // זירה - רשימת זירות
-  priority: PriorityOption
-  sagachType?: string // סוג הסג"ח - optional free text field
-  processStatus: 1 | 2 | 3 | 4 | 5 | 6 | 7 // Current step in process chain (1-7)
-  processStartDate?: string
-  estimatedCompletion?: string
-  contactPerson?: string
-  notes?: string
-  statusUpdates?: StatusUpdate[] // Chat-like updates with timestamps
-  phaseData?: {
-    [key: number]: PhaseData // Phase number (1-7) -> timing data
-  }
-  notifications?: boolean // Whether current user is subscribed to updates (for backward compatibility)
-  notificationMethod?: 'email' | 'whatsapp' // How to receive notifications
-  notificationFrequency?: 'daily' | 'weekly' | 'status_change' // Notification frequency
-  completionDate?: string // Date when status was set to "מובצע" (7)
-  notificationSubscribers?: NotificationSubscriber[] // List of users subscribed to notifications for this sagach
-  attachments?: FileAttachment[] // Relevant files attached to this sagach
-}
 
-interface NotificationSubscriber {
-  userId: string
-  userName: string
-  notificationMethod: 'email' | 'whatsapp'
-  notificationFrequency: 'daily' | 'weekly' | 'status_change'
-  subscribedAt: string
-}
 
 const PROCESS_STEPS = [
   'ממתין לבשלות בצד ספק',
@@ -139,16 +98,16 @@ export const SagachimStatus = memo(() => {
   const { canEditStatus, canCreateSagach, canDeleteSagach, canChat, user, hasRole } = usePermissions()
   const { sagachimStatus, addSagachimStatus, updateSagachimStatus, deleteSagachimStatus, clearAllData, isLoading, error } = useSagachData()
   
-  // Helper functions for notification subscribers
-  const isUserSubscribed = (sagach: SagachimStatusItem, userId: string): boolean => {
+  // Helper functions for notification subscribers - memoized for performance
+  const isUserSubscribed = useCallback((sagach: SagachimStatusItem, userId: string): boolean => {
     return sagach.notificationSubscribers?.some(sub => sub.userId === userId) || false
-  }
-  
-  const getUserSubscription = (sagach: SagachimStatusItem, userId: string): NotificationSubscriber | undefined => {
+  }, [])
+
+  const getUserSubscription = useCallback((sagach: SagachimStatusItem, userId: string): NotificationSubscriber | undefined => {
     return sagach.notificationSubscribers?.find(sub => sub.userId === userId)
-  }
-  
-  const addNotificationSubscriber = (sagach: SagachimStatusItem, userId: string, userName: string, method: 'email' | 'whatsapp', frequency: 'daily' | 'weekly' | 'status_change'): SagachimStatusItem => {
+  }, [])
+
+  const addNotificationSubscriber = useCallback((sagach: SagachimStatusItem, userId: string, userName: string, method: 'email', frequency: 'daily' | 'weekly' | 'status_change'): SagachimStatusItem => {
     const newSubscriber: NotificationSubscriber = {
       userId,
       userName,
@@ -156,10 +115,10 @@ export const SagachimStatus = memo(() => {
       notificationFrequency: frequency,
       subscribedAt: new Date().toISOString()
     }
-    
+
     const existingSubscribers = sagach.notificationSubscribers || []
     const updatedSubscribers = [...existingSubscribers.filter(sub => sub.userId !== userId), newSubscriber]
-    
+
     return {
       ...sagach,
       notificationSubscribers: updatedSubscribers,
@@ -168,18 +127,18 @@ export const SagachimStatus = memo(() => {
       notificationMethod: method,
       notificationFrequency: frequency
     }
-  }
-  
-  const removeNotificationSubscriber = (sagach: SagachimStatusItem, userId: string): SagachimStatusItem => {
+  }, [isUserSubscribed])
+
+  const removeNotificationSubscriber = useCallback((sagach: SagachimStatusItem, userId: string): SagachimStatusItem => {
     const updatedSubscribers = (sagach.notificationSubscribers || []).filter(sub => sub.userId !== userId)
-    
+
     return {
       ...sagach,
       notificationSubscribers: updatedSubscribers,
       // Keep backward compatibility
       notifications: false
     }
-  }
+  }, [])
   
   
   // Standardized button styles
@@ -272,7 +231,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   
   // Notification settings popup
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState<boolean>(false)
-  const [notificationMethod, setNotificationMethod] = useState<'email' | 'whatsapp'>('email')
+  const [notificationMethod, setNotificationMethod] = useState<'email'>('email')
   const [notificationFrequency, setNotificationFrequency] = useState<'daily' | 'weekly' | 'status_change'>('status_change')
   
   // Loading states for actions
@@ -422,65 +381,54 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   }
 
   // Check if a Sagach is overdue (expected date has passed but hasn't moved to next stage)
-  const isSagachOverdue = (sagach: SagachimStatusItem): boolean => {
+  // Memoize current date for performance
+  const currentDateOnly = useMemo(() => {
+    const currentDate = getCurrentDate()
+    return new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
+  }, [currentDate])
+
+  // Optimized date parsing function
+  const parseEstimatedDate = useCallback((dateString: string): Date | null => {
+    if (!dateString?.trim()) return null
+
+    try {
+      // Check if it's in DD/MM/YYYY format first (most common)
+      const ddMMyyyyRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+      const ddMMyyyyMatch = dateString.match(ddMMyyyyRegex)
+
+      if (ddMMyyyyMatch) {
+        const day = parseInt(ddMMyyyyMatch[1])
+        const month = parseInt(ddMMyyyyMatch[2]) - 1 // JavaScript months are 0-based
+        const year = parseInt(ddMMyyyyMatch[3])
+        return new Date(year, month, day)
+      }
+
+      // Fallback to standard Date parsing
+      const parsed = new Date(dateString)
+      return isNaN(parsed.getTime()) ? null : parsed
+    } catch {
+      return null
+    }
+  }, [])
+
+  const isSagachOverdue = useCallback((sagach: SagachimStatusItem): boolean => {
     // Don't mark completed sagachs as overdue
     if (sagach.processStatus === 7) {
       return false
     }
-    
+
     if (!sagach.estimatedCompletion) {
       return false
     }
-    
-    try {
-      let expectedDate: Date
-      const currentDate = getCurrentDate()
-      
-      // Try different date formats
-      const dateString = sagach.estimatedCompletion.trim()
-      
-      // Check if it's in DD/MM/YYYY format
-      const ddMMyyyyRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
-      const ddMMyyyyMatch = dateString.match(ddMMyyyyRegex)
-      
-      if (ddMMyyyyMatch) {
-        // DD/MM/YYYY format
-        const day = parseInt(ddMMyyyyMatch[1])
-        const month = parseInt(ddMMyyyyMatch[2]) - 1 // JavaScript months are 0-based
-        const year = parseInt(ddMMyyyyMatch[3])
-        expectedDate = new Date(year, month, day)
-      } else {
-        // Try standard Date parsing
-        expectedDate = new Date(sagach.estimatedCompletion)
-      }
-      
-      // Check if the date is valid
-      if (isNaN(expectedDate.getTime())) {
-        return false
-      }
-      
-      // Compare dates (date only, no time)
-      const expectedDateOnly = new Date(expectedDate.getFullYear(), expectedDate.getMonth(), expectedDate.getDate())
-      const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
-      
-      const isOverdue = expectedDateOnly < currentDateOnly
-      
-      // Log for debugging - only for specific sagach to avoid loops
-      if (sagach.name === 'dsa') {
-        console.log(`🔍 OVERDUE CHECK for "${sagach.name}":`)
-        console.log(`  estimatedCompletion: "${sagach.estimatedCompletion}"`)
-        console.log(`  processStatus: ${sagach.processStatus}`)
-        console.log(`  expectedDateOnly: ${expectedDateOnly.toISOString()}`)
-        console.log(`  currentDateOnly: ${currentDateOnly.toISOString()}`)
-        console.log(`  isOverdue: ${isOverdue}`)
-      }
-      
-      return isOverdue
-    } catch (error) {
-      console.error('Error checking overdue status:', error)
-      return false
-    }
-  }
+
+    const expectedDate = parseEstimatedDate(sagach.estimatedCompletion)
+    if (!expectedDate) return false
+
+    // Compare dates (date only, no time)
+    const expectedDateOnly = new Date(expectedDate.getFullYear(), expectedDate.getMonth(), expectedDate.getDate())
+
+    return expectedDateOnly < currentDateOnly
+  }, [currentDateOnly, parseEstimatedDate])
 
   // Update current date when mock date changes
   useEffect(() => {
@@ -506,21 +454,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     return () => clearInterval(interval)
   }, [mockDate])
 
-  // State to force re-render when times change
-  const [, forceUpdate] = useState(0)
-
-  // Force re-render when any data that affects time calculations changes
-  useEffect(() => {
-    forceUpdate(prev => prev + 1)
-  }, [selectedSagach?.id, selectedSagach?.processStatus, selectedSagach?.lastUpdated, mockDate, currentDate, sagachimStatus.length])
-
-  // Additional state for immediate time updates
-  const [, immediateUpdate] = useState(0)
-  useEffect(() => {
-    if (selectedSagach) {
-      immediateUpdate(prev => prev + 1)
-    }
-  }, [mockDate, currentDate])
+  // State for tracking time updates without forcing unnecessary re-renders
+  const [, timeUpdate] = useState(0)
 
   // Update all sagach time calculations on mount and when date changes
   useEffect(() => {
@@ -582,10 +517,9 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     // Update times on mount and when date changes
     updateAllSagachTimes()
 
-    // Force re-render after updating times
-    forceUpdate(prev => prev + 1)
-    immediateUpdate(prev => prev + 1)
-  }, [mockDate, currentDate, sagachimStatus.length, forceUpdate, immediateUpdate])
+    // Update time tracking
+    timeUpdate(prev => prev + 1)
+  }, [mockDate, currentDate, sagachimStatus.length])
 
   // Calculate days spent in a specific phase
   const calculatePhaseDays = useCallback((phaseData: PhaseData, isCurrentPhase: boolean = false): number => {
@@ -766,38 +700,46 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
 
   // Filter and sort sagachim based on search, filters, and sort order
   const filteredSagachim = useMemo(() => {
-    console.log('🔍 Filtering sagachim. Total sagachs:', sagachimStatus.length)
-    console.log('🔍 All sagachim data:', sagachimStatus)
-    
-    // Log each sagach's estimatedCompletion and overdue status
-    sagachimStatus.forEach(sagach => {
-      const isOverdue = isSagachOverdue(sagach)
-      console.log(`🔍 Sagach "${sagach.name}": estimatedCompletion = "${sagach.estimatedCompletion}", processStatus = ${sagach.processStatus}, isOverdue = ${isOverdue}`)
-    })
-    
+    // Pre-compute values to avoid repeated calculations
+    const searchLower = searchQuery.toLowerCase()
+    const hasSearch = searchQuery.length > 0
+    const hasProviderFilter = selectedProvider.length > 0
+    const hasArenaFilter = selectedArena.length > 0
+    const hasProcessStatusFilter = selectedProcessStatus.length > 0
+    const hasSagachTypeFilter = selectedSagachType.length > 0
+    const currentDate = getCurrentDate()
+    const oneWeekAgo = new Date(currentDate)
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+
     let filtered = sagachimStatus.filter(sagach => {
-      // Hide completed sagachs after 1 week
+      // Hide completed sagachs after 1 week - optimized date check
       if (sagach.processStatus === 7 && sagach.completionDate) {
         const completionDate = new Date(sagach.completionDate)
-        const oneWeekAgo = new Date(getCurrentDate())
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-        
-        // If completed more than a week ago, hide it
         if (completionDate < oneWeekAgo) {
           return false
         }
       }
-      
-      const matchesSearch = !searchQuery ||
-        sagach.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        sagach.description.toLowerCase().includes(searchQuery.toLowerCase())
 
-      const matchesProvider = !selectedProvider || sagach.provider === selectedProvider
-      const matchesArena = !selectedArena || sagach.arena.includes(selectedArena)
-      const matchesProcessStatus = !selectedProcessStatus || sagach.processStatus.toString() === selectedProcessStatus
-      const matchesSagachType = !selectedSagachType || (sagach.sagachType || '') === selectedSagachType
+      // Early return for performance if no search query
+      if (hasSearch) {
+        const nameMatch = sagach.name.toLowerCase().includes(searchLower)
+        const descMatch = sagach.description.toLowerCase().includes(searchLower)
+        if (!nameMatch && !descMatch) return false
+      }
 
-      return matchesSearch && matchesProvider && matchesArena && matchesProcessStatus && matchesSagachType
+      // Provider filter
+      if (hasProviderFilter && sagach.provider !== selectedProvider) return false
+
+      // Arena filter
+      if (hasArenaFilter && selectedArena && !sagach.arena.includes(selectedArena)) return false
+
+      // Process status filter
+      if (hasProcessStatusFilter && sagach.processStatus.toString() !== selectedProcessStatus) return false
+
+      // Sagach type filter
+      if (hasSagachTypeFilter && (sagach.sagachType || '') !== selectedSagachType) return false
+
+      return true
     })
 
     // Sort by process status if sort order is specified
@@ -811,11 +753,6 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         return 0
       })
     }
-
-    console.log('🔍 Filtered sagachs result:', filtered.length, 'sagachs')
-    filtered.forEach(sagach => {
-      console.log(`  - ${sagach.name} (processStatus: ${sagach.processStatus})`)
-    })
 
     return filtered
   }, [sagachimStatus, searchQuery, selectedProvider, selectedArena, selectedProcessStatus, selectedSagachType, sortOrder])
@@ -833,13 +770,13 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     }
   }
 
-  const handleSagachClick = (sagach: SagachimStatusItem) => {
+  const handleSagachClick = useCallback((sagach: SagachimStatusItem) => {
     setIsEditingDetails(false)
     setSelectedSagach(sagach)
     setNewUpdate('')
     setEditingStatus(false)
     setNewStatusValue(sagach.processStatus)
-  }
+  }, [])
 
   const handleDeleteSagach = (sagachId: string, event: React.MouseEvent) => {
     event.stopPropagation() // Prevent triggering the card click
@@ -1163,9 +1100,9 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   }
 
   // Handle details editing functions
-  const handleStartEditing = () => {
+  const handleStartEditing = useCallback(() => {
     if (!selectedSagach) return
-    
+
     setEditValues({
       description: selectedSagach.description,
       provider: selectedSagach.provider,
@@ -1177,7 +1114,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
       attachments: selectedSagach.attachments || []
     })
     setIsEditingDetails(true)
-  }
+  }, [selectedSagach])
 
   const handleSaveDetails = async () => {
     if (!selectedSagach) return
@@ -1478,13 +1415,14 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
       // Add to sagachim array
       console.log('🆕 Creating new sagach:', newSagach.name)
       addSagachimStatus(newSagach);
-      
+
       // Reset form and close popup
       setNewSagachForm({ name: '', description: '', provider: '', arena: [] as ArenaOption[], priority: 'בינוני' as PriorityOption, sagachType: '' })
       setIsNewSagachPopupOpen(false)
-      
-      // Open the new sagach for editing
-      setSelectedSagach(newSagach);
+
+      // Find and open the new sagach for editing
+      const createdSagach = sagachimStatus.find(s => s.name === newSagach.name && s.description === newSagach.description);
+      setSelectedSagach(createdSagach || null);
       
       // Show success indicator
       showPopupIndicator('סג"ח חדש נוצר בהצלחה', 'success')
@@ -4979,7 +4917,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                     const phaseData = selectedSagach.phaseData?.[stepNumber]
 
                     return (
-                      <div key={`${stepNumber}-${selectedSagach.id}-${selectedSagach.processStatus}-${selectedSagach.lastUpdated}-${currentDate.getTime()}-${forceUpdate}-${immediateUpdate}`} style={{
+                      <div key={`${stepNumber}-${selectedSagach.id}-${selectedSagach.processStatus}-${selectedSagach.lastUpdated}-${currentDate.getTime()}-${timeUpdate}`} style={{
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -5508,28 +5446,6 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                 }}
               >
                 📧 מייל
-              </button>
-              <button
-                onClick={() => setNotificationMethod('whatsapp')}
-                style={{
-                  background: notificationMethod === 'whatsapp' 
-                    ? 'linear-gradient(135deg, rgba(49, 10, 244, 0.8), rgba(49, 19, 245, 0.6))' 
-                    : 'rgba(255,255,255,0.08)',
-                  border: '1px solid ' + (notificationMethod === 'whatsapp' 
-                    ? 'rgba(13, 27, 224, 0.8)' 
-                    : 'rgba(255,255,255,0.2)'),
-                  borderRadius: '12px',
-                  padding: '12px 20px',
-                  color: notificationMethod === 'whatsapp' ? 'white' : 'var(--text)',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  flex: '1',
-                  minWidth: '120px'
-                }}
-              >
-                💬 HiChat
               </button>
             </div>
           </div>

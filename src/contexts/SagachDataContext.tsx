@@ -60,6 +60,16 @@ export interface PhaseData {
   totalTimeSpentDays?: number
 }
 
+export interface FileAttachment {
+  id: string
+  name: string
+  type: string
+  size: number
+  uploadDate: string
+  url?: string // For downloaded files or file references
+  data?: string // Base64 data for small files or file content
+}
+
 export interface SagachimStatusItem {
   id: string
   name: string
@@ -79,10 +89,11 @@ export interface SagachimStatusItem {
     [key: number]: PhaseData
   }
   notifications?: boolean
-  notificationMethod?: 'email' | 'whatsapp'
+  notificationMethod?: 'email'
   notificationFrequency?: 'daily' | 'weekly' | 'status_change'
   completionDate?: string
   notificationSubscribers?: NotificationSubscriber[]
+  attachments?: FileAttachment[] // Relevant files attached to this sagach
   createdBy: string
   createdAt: string
   lastModifiedBy: string
@@ -101,10 +112,10 @@ interface StatusUpdate {
 }
 
 
-interface NotificationSubscriber {
+export interface NotificationSubscriber {
   userId: string
   userName: string
-  notificationMethod: 'email' | 'whatsapp'
+  notificationMethod: 'email'
   notificationFrequency: 'daily' | 'weekly' | 'status_change'
   subscribedAt: string
 }

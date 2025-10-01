@@ -17,6 +17,7 @@ import { PermissionManager } from './components/PermissionManager'
 import { usePermissions } from './contexts/PermissionContext'
 import { useSagachData } from './contexts/SagachDataContext'
 import ErrorBoundary from './components/ErrorBoundary'
+import { getNotificationService } from './services/notificationService'
 
 
 const sampleJson = `{
@@ -168,6 +169,31 @@ function AppContent() {
   const [toastShown, setToastShown] = useState<boolean>(false)
   const toastHideTimerRef = useRef<number | null>(null)
   const toastRemoveTimerRef = useRef<number | null>(null)
+
+  // ----- NOTIFICATION SERVICE INITIALIZATION -----
+  useEffect(() => {
+    // Initialize notification service when app starts
+    const initializeNotifications = async () => {
+      try {
+        const notificationService = getNotificationService()
+        await notificationService.start()
+        console.log('🔔 Notification service initialized successfully')
+      } catch (error) {
+        console.error('❌ Failed to initialize notification service:', error)
+      }
+    }
+
+    // Only initialize if user is logged in and has permissions
+    if (user && !isLoading) {
+      initializeNotifications()
+    }
+
+    // Cleanup on unmount
+    return () => {
+      const notificationService = getNotificationService()
+      notificationService.stop()
+    }
+  }, [user, isLoading])
 
   // ----- VIZ SCREEN STATE / מצבי מסך "ויזואליזציה" -----
   const [rawInput, setRawInput] = useState<string>(sampleJson)
