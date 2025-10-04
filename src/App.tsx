@@ -155,7 +155,7 @@ interface MappingData {
 type ToastType = 'ok' | 'warn' | 'error'
 
 function AppContent() {
-  const { user, isLoading, canManageUsers } = usePermissions()
+  const { user, isLoading, canManageUsers, canValidateJson } = usePermissions()
   const { sagachimStatus } = useSagachData()
 
   // ----- GLOBAL APP STATE / מצב גלובלי המשפיע על כל המסכים -----
@@ -1984,34 +1984,40 @@ function AppContent() {
                     סטטוס סג"חים
                   </div>
 
-                  <div
-                    className="schema-option"
-                    role="menuitem"
-                    onClick={() => {
-                      console.log('Clicking validator option')
-                      setActiveScreen('validator')
-                      setIsNavOpen(false)
-                      setIsUploadMenuOpen(false)
-                      setIsDownloadMenuOpen(false)
-                      setIsSchemaDropdownOpen(false)
-                    }}
-                    onMouseEnter={() => console.log('Hovering over validator option')}
-                    onMouseLeave={() => console.log('Leaving validator option')}
-                    style={{
-                      position: 'relative',
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid rgba(255,255,255,0.06)',
-                      transition: 'background 0.2s ease',
-                      fontSize: '14px',
-                      color: '#ffffff',
-                      textAlign: 'center',
-                      pointerEvents: 'auto',
-                      zIndex: 9999999
-                    }}
-                  >
-                    בודק תקינות JSON
-                  </div>
+                  {(() => {
+                    const shouldShow = canValidateJson()
+                    console.log('Validator menu item condition:', { shouldShow, user: user?.role, activeScreen })
+                    return shouldShow
+                  })() && (
+                    <div
+                      className="schema-option"
+                      role="menuitem"
+                      onClick={() => {
+                        console.log('Clicking validator option')
+                        setActiveScreen('validator')
+                        setIsNavOpen(false)
+                        setIsUploadMenuOpen(false)
+                        setIsDownloadMenuOpen(false)
+                        setIsSchemaDropdownOpen(false)
+                      }}
+                      onMouseEnter={() => console.log('Hovering over validator option')}
+                      onMouseLeave={() => console.log('Leaving validator option')}
+                      style={{
+                        position: 'relative',
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid rgba(255,255,255,0.06)',
+                        transition: 'background 0.2s ease',
+                        fontSize: '14px',
+                        color: '#ffffff',
+                        textAlign: 'center',
+                        pointerEvents: 'auto',
+                        zIndex: 9999999
+                      }}
+                    >
+                      בודק תקינות JSON
+                    </div>
+                  )}
 
                 </div>
               )}
@@ -2094,7 +2100,7 @@ function AppContent() {
           <SagachimArchive onBack={() => setActiveScreen('status')} />
         ) : activeScreen === 'analytics' ? (
           <SagachimAnalytics />
-        ) : activeScreen === 'validator' ? (
+        ) : activeScreen === 'validator' && canValidateJson() ? (
           <JsonSchemaValidator onBack={() => setActiveScreen('status')} />
         ) : user && user.role !== 'admin' ? (
           <div style={{

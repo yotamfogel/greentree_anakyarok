@@ -6,19 +6,20 @@ import { adfsLogin, adfsLogout, getCurrentAdfsUser, initializeAdfs } from '../se
 export type UserRole = 'viewer' | 'editor' | 'admin'
 
 // Permission types for different actions
-export type Permission = 
+export type Permission =
   | 'edit_status'      // Can edit sagach statuses
   | 'create_sagach'    // Can create new sagachs
   | 'delete_sagach'    // Can delete sagachs
   | 'chat_message'     // Can type in chat/status updates
   | 'manage_users'     // Can manage user permissions
   | 'view_all'         // Can view all sagachs (always true for all roles)
+  | 'validate_json'    // Can access JSON schema validator
 
 // Role-based permissions mapping
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  viewer: ['view_all'],
-  editor: ['view_all', 'chat_message'],
-  admin: ['view_all', 'edit_status', 'create_sagach', 'delete_sagach', 'chat_message', 'manage_users']
+  viewer: ['view_all', 'validate_json'],
+  editor: ['view_all', 'chat_message', 'validate_json'],
+  admin: ['view_all', 'edit_status', 'create_sagach', 'delete_sagach', 'chat_message', 'manage_users', 'validate_json']
 }
 
 // User interface
@@ -44,6 +45,7 @@ interface PermissionContextType {
   canDeleteSagach: () => boolean
   canChat: () => boolean
   canManageUsers: () => boolean
+  canValidateJson: () => boolean
   isLoading: boolean
   authMode: AuthMode
   canSwitchAuthMode: boolean
@@ -254,6 +256,12 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     return hasPermission('manage_users')
   }
 
+  const canValidateJson = (): boolean => {
+    const result = hasPermission('validate_json')
+    console.log('canValidateJson called:', { user: user?.role, result })
+    return result
+  }
+
   const value: PermissionContextType = {
     user,
     login,
@@ -266,6 +274,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     canDeleteSagach,
     canChat,
     canManageUsers,
+    canValidateJson,
     isLoading,
     authMode,
     canSwitchAuthMode: !!(import.meta.env.VITE_ADFS_CLIENT_ID && import.meta.env.VITE_ADFS_AUTHORITY)
