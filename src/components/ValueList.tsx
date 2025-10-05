@@ -458,7 +458,7 @@ export function ValueList({ schemas }: ValueListProps) {
             {selected ? (() => {
               const parts = selected.path.split('.')
               if (parts.length <= 2) return selected.name
-              return `${parts.slice(1, parts.length - 1).join(' -> ')} -> ${selected.name}`
+              return `${parts.slice(1, parts.length - 1).join('.')}.${selected.name}`
             })() : '-'}
           </div>
         </div>
