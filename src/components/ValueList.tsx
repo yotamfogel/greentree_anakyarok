@@ -67,6 +67,25 @@ function flattenJsonSchema(schemaKey: string, schemaTitle: string, schema: any):
   return results
 }
 
+// Function to generate consistent colors for families
+const generateFamilyColor = (familyName: string): string => {
+  const colors = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+    '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+    '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7DBDD'
+  ]
+  
+  // Simple hash function to get consistent color for each family
+  let hash = 0
+  for (let i = 0; i < familyName.length; i++) {
+    const char = familyName.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // Convert to 32-bit integer
+  }
+  
+  return colors[Math.abs(hash) % colors.length]
+}
+
 export function ValueList({ schemas }: ValueListProps) {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<FieldEntry | null>(null)
@@ -136,6 +155,40 @@ export function ValueList({ schemas }: ValueListProps) {
       })
     }
     // If filterType is 'all' (default), show all fields
+    
+    // Apply duplicate field filtering - show identical field names with identical hierarchies 
+    // only if they are from different sagach families (schemas)
+    const fieldGroups = new Map<string, FieldEntry[]>()
+    
+    // Group fields by field name and hierarchy path
+    filteredFields.forEach(field => {
+      const hierarchyPath = field.path.split('.').slice(1, -1).join('.') // Remove schema name and field name
+      const key = `${field.name}|${hierarchyPath}`
+      
+      if (!fieldGroups.has(key)) {
+        fieldGroups.set(key, [])
+      }
+      fieldGroups.get(key)!.push(field)
+    })
+    
+    // Filter to keep only groups with multiple schemas or single entries
+    filteredFields = []
+    fieldGroups.forEach(group => {
+      if (group.length === 1) {
+        // Single field - always include
+        filteredFields.push(group[0])
+      } else {
+        // Multiple fields with same name and hierarchy - only include if from different schemas
+        const uniqueSchemas = new Set(group.map(f => f.schemaKey))
+        if (uniqueSchemas.size > 1) {
+          // Different sagach families - include all
+          filteredFields.push(...group)
+        } else {
+          // Same sagach family - include only the first one to avoid duplicates
+          filteredFields.push(group[0])
+        }
+      }
+    })
     
     // Apply search filter
     const q = query.trim().toLowerCase()
@@ -322,12 +375,44 @@ export function ValueList({ schemas }: ValueListProps) {
                 }}
               >
                 <div className="value-row">
-                  <span className="value-hierarchy">{(() => {
-                    const parts = item.path.split('.')
-                    if (parts.length <= 2) return ''
-                    return parts.slice(1, parts.length - 1).join('.')
-                  })()}</span>
-                  <span className="value-name">{item.name}</span>
+                  <span 
+                    className="value-family" 
+                    style={{ 
+                      color: generateFamilyColor(item.schemaTitle),
+                      fontWeight: 'bold',
+                      fontSize: '12px',
+                      flex: '0 0 auto',
+                      minWidth: 'fit-content',
+                      marginRight: '8px'
+                    }}
+                  >
+                    {item.schemaTitle}
+                  </span>
+                  <span 
+                    className="value-hierarchy" 
+                    style={{
+                      flex: '1 1 auto',
+                      minWidth: '0',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {(() => {
+                      const parts = item.path.split('.')
+                      if (parts.length <= 2) return ''
+                      return parts.slice(1, parts.length - 1).join('.')
+                    })()}
+                  </span>
+                  <span 
+                    className="value-name" 
+                    style={{
+                      flex: '0 0 auto',
+                      minWidth: 'fit-content'
+                    }}
+                  >
+                    {item.name}
+                  </span>
                 </div>
               </button>
             ))}

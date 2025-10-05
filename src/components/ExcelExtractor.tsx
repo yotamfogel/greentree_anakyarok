@@ -12,7 +12,7 @@ function hexToARGB(hex: string): string {
 // Color options for cubes with matching glows
 const CUBE_COLORS = {
   default: { bg: 'linear-gradient(180deg, rgba(124,192,255,0.18), rgba(124,192,255,0.08))' },
-  green: { bg: '#4CAF50' },
+  green: { bg: '#2E7D32' }, // Darker green for unmapped fields
   red: { bg: '#F44336' },
   yellow: { bg: '#E6A700' }
 }
@@ -234,8 +234,8 @@ export function ExcelExtractor() {
     }
   }, [])
   
-  // Helper to compute full hierarchy label from a target node id (e.g., "a.b.c:42" -> "a -> b -> c" or "a.b.c")
-  const getFullHierarchyLabel = (targetNode?: { id?: string; name?: string; path?: string } | null, separator: string = ' -> '): string => {
+  // Helper to compute full hierarchy label from a target node id (e.g., "a.b.c:42" -> "a.b.c")
+  const getFullHierarchyLabel = (targetNode?: { id?: string; name?: string; path?: string } | null, separator: string = '.'): string => {
     try {
       if (!targetNode) return ''
       // Prefer explicit path from imported mapping (e.g., "a.b.c")
@@ -844,6 +844,36 @@ export function ExcelExtractor() {
 
       const updatedFields = Array.from(updatedFieldsMap.values())
       setExcelFields(updatedFields)
+
+      // Check if there's a דג"ח sheet in the uploaded mapping file and preserve it
+      try {
+        const dghSheet = wb.getWorksheet('דג"ח')
+        if (dghSheet) {
+          console.log('Found דג"ח sheet in uploaded mapping file, preserving it')
+          const dghRows: Array<{ name: string; type: string; essence: string; dgh: string; always: string; notes: string }> = []
+          const dghRowCount = dghSheet.rowCount
+          
+          // Skip header row (row 1), start from row 2
+          for (let r = 2; r <= dghRowCount; r++) {
+            const name = String(dghSheet.getRow(r).getCell(1).value ?? '').trim()
+            const type = String(dghSheet.getRow(r).getCell(2).value ?? '').trim()
+            const essence = String(dghSheet.getRow(r).getCell(3).value ?? '').trim()
+            const dgh = String(dghSheet.getRow(r).getCell(4).value ?? '').trim()
+            const always = String(dghSheet.getRow(r).getCell(5).value ?? '').trim()
+            const notes = String(dghSheet.getRow(r).getCell(6).value ?? '').trim()
+            if (!name && !type && !essence && !dgh && !always && !notes) continue
+            dghRows.push({ name, type, essence, dgh, always, notes })
+          }
+          
+          // Update the originalExcelData with the דג"ח sheet data
+          setOriginalExcelData(dghRows)
+          console.log('Preserved דג"ח sheet data:', dghRows.length, 'rows')
+        } else {
+          console.log('No דג"ח sheet found in uploaded mapping file')
+        }
+      } catch (e) {
+        console.warn('Failed to read דג"ח sheet from mapping file:', e)
+      }
 
       // Announce for App to persist mappings
       window.dispatchEvent(new CustomEvent('excel:mappings-imported', { detail: { mappings: importedMappings } }))

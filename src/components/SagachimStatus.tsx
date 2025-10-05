@@ -2673,7 +2673,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-4px)'
               e.currentTarget.style.boxShadow = isCompleted
-                ? '0 12px 40px rgba(76,175,80,0.3), inset 0 1px 0 rgba(76,175,80,0.15)'
+                ? '0 0 25px rgba(76,175,80,0.5), 0 0 50px rgba(76,175,80,0.3), inset 0 1px 0 rgba(76,175,80,0.15)'
                 : isOverdue
                 ? '0 12px 40px rgba(255,165,0,0.5), inset 0 1px 0 rgba(255,165,0,0.25)'
                 : '0 12px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)'
@@ -2681,7 +2681,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0px)'
               e.currentTarget.style.boxShadow = isCompleted
-                ? '0 8px 32px rgba(76,175,80,0.2), inset 0 1px 0 rgba(76,175,80,0.1)'
+                ? '0 0 20px rgba(76,175,80,0.4), 0 0 40px rgba(76,175,80,0.2), inset 0 1px 0 rgba(76,175,80,0.1)'
                 : isOverdue
                 ? '0 8px 32px rgba(255,165,0,0.2), inset 0 1px 0 rgba(255,165,0,0.1)'
                 : '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
