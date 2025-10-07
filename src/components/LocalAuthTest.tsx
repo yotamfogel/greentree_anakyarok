@@ -9,29 +9,29 @@ export const LocalAuthTest: React.FC = () => {
     setTestResults(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`])
   }
 
-  const testLocalLogin = async () => {
-    addResult('Testing local login...')
+  const testAdminLogin = async () => {
+    addResult('Testing admin login...')
     try {
-      await login({
-        name: 'Test User',
-        email: 'test@example.com',
-        role: 'admin'
-      })
-      addResult('✅ Local login successful!')
+      const success = await login('admin', 'admin')
+      if (success) {
+        addResult('✅ Admin login successful!')
+      } else {
+        addResult('❌ Admin login failed!')
+      }
     } catch (error) {
-      addResult(`❌ Local login failed: ${error}`)
+      addResult(`❌ Admin login failed: ${error}`)
     }
   }
 
   const testViewerLogin = async () => {
     addResult('Testing viewer login...')
     try {
-      await login({
-        name: 'Viewer User',
-        email: 'viewer@example.com',
-        role: 'viewer'
-      })
-      addResult('✅ Viewer login successful!')
+      const success = await login('viewer', 'viewer')
+      if (success) {
+        addResult('✅ Viewer login successful!')
+      } else {
+        addResult('❌ Viewer login failed!')
+      }
     } catch (error) {
       addResult(`❌ Viewer login failed: ${error}`)
     }
@@ -40,12 +40,12 @@ export const LocalAuthTest: React.FC = () => {
   const testEditorLogin = async () => {
     addResult('Testing editor login...')
     try {
-      await login({
-        name: 'Editor User',
-        email: 'editor@example.com',
-        role: 'editor'
-      })
-      addResult('✅ Editor login successful!')
+      const success = await login('editor', 'editor')
+      if (success) {
+        addResult('✅ Editor login successful!')
+      } else {
+        addResult('❌ Editor login failed!')
+      }
     } catch (error) {
       addResult(`❌ Editor login failed: ${error}`)
     }
@@ -65,7 +65,7 @@ export const LocalAuthTest: React.FC = () => {
     setTestResults([])
   }
 
-  if (authMode !== 'local') {
+  if (authMode !== 'server') {
     return (
       <div style={{
         padding: '16px',
@@ -76,10 +76,10 @@ export const LocalAuthTest: React.FC = () => {
         direction: 'rtl'
       }}>
         <h3 style={{ margin: '0 0 12px 0', color: 'var(--text)' }}>
-          בדיקת אימות מקומי
+          בדיקת אימות שרת
         </h3>
         <p style={{ color: 'var(--muted)', margin: 0 }}>
-          בדיקה זו זמינה רק במצב אימות מקומי. מצב נוכחי: {authMode}
+          בדיקה זו זמינה רק במצב אימות שרת. מצב נוכחי: {authMode}
         </p>
       </div>
     )
@@ -95,7 +95,7 @@ export const LocalAuthTest: React.FC = () => {
       direction: 'rtl'
     }}>
       <h3 style={{ margin: '0 0 12px 0', color: 'var(--text)' }}>
-        בדיקת אימות מקומי
+        בדיקת אימות שרת
       </h3>
       
       <div style={{ marginBottom: '16px' }}>
@@ -106,7 +106,7 @@ export const LocalAuthTest: React.FC = () => {
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button
-          onClick={testLocalLogin}
+          onClick={testAdminLogin}
           style={{
             padding: '8px 16px',
             backgroundColor: 'var(--accent)',

@@ -19,6 +19,8 @@ export function PermissionManager({ isOpen, onClose }: PermissionManagerProps) {
   const [users, setUsers] = useState<User[]>([])
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [isAddingUser, setIsAddingUser] = useState(false)
+  const [showAddRoleDropdown, setShowAddRoleDropdown] = useState(false)
+  const [editingRoleDropdown, setEditingRoleDropdown] = useState<string | null>(null)
   const [newUser, setNewUser] = useState<Partial<User>>({
     name: '',
     email: '',
@@ -31,6 +33,26 @@ export function PermissionManager({ isOpen, onClose }: PermissionManagerProps) {
       loadUsers()
     }
   }, [isOpen])
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showAddRoleDropdown) {
+        setShowAddRoleDropdown(false)
+      }
+      if (editingRoleDropdown) {
+        setEditingRoleDropdown(null)
+      }
+    }
+
+    if (showAddRoleDropdown || editingRoleDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showAddRoleDropdown, editingRoleDropdown])
 
   const loadUsers = () => {
     try {
@@ -240,23 +262,73 @@ export function PermissionManager({ isOpen, onClose }: PermissionManagerProps) {
                       direction: 'rtl'
                     }}
                   />
-                  <select
-                    value={newUser.role || 'viewer'}
-                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as UserRole })}
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid rgba(255,255,255,0.3)',
-                      background: 'rgba(255,255,255,0.1)',
-                      color: '#fff',
-                      fontFamily: 'Segoe UI, Arial, sans-serif',
-                      direction: 'rtl'
-                    }}
-                  >
-                    <option value="viewer">צופה</option>
-                    <option value="editor">עורך</option>
-                    <option value="admin">מנהל</option>
-                  </select>
+                  <div className="action-dropdown" style={{ position: 'relative', width: '100%' }}>
+                    <button
+                      className="btn ghost"
+                      onClick={() => setShowAddRoleDropdown(!showAddRoleDropdown)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255,255,255,0.3)',
+                        background: 'rgba(255,255,255,0.1)',
+                        color: '#fff',
+                        fontFamily: 'Segoe UI, Arial, sans-serif',
+                        direction: 'rtl',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        textAlign: 'right'
+                      }}
+                    >
+                      <span>{getRoleDisplayName(newUser.role || 'viewer')}</span>
+                      <span style={{ fontSize: '10px', opacity: 0.7 }}>▼</span>
+                    </button>
+                    {showAddRoleDropdown && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        background: 'rgba(0,0,0,0.9)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '6px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                        zIndex: 1000,
+                        marginTop: '4px'
+                      }}>
+                        {(['viewer', 'editor', 'admin'] as UserRole[]).map((role) => (
+                          <button
+                            key={role}
+                            onClick={() => {
+                              setNewUser({ ...newUser, role })
+                              setShowAddRoleDropdown(false)
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#fff',
+                              fontFamily: 'Segoe UI, Arial, sans-serif',
+                              cursor: 'pointer',
+                              textAlign: 'right',
+                              direction: 'rtl',
+                              borderBottom: role !== 'admin' ? '1px solid rgba(255,255,255,0.1)' : 'none'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.backgroundColor = 'rgba(124,192,255,0.1)'
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                            }}
+                          >
+                            {getRoleDisplayName(role)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button 
                       className="btn primary"
@@ -318,23 +390,74 @@ export function PermissionManager({ isOpen, onClose }: PermissionManagerProps) {
                     <div className="user-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {editingUser?.id === user.id ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <select
-                            value={editingUser.role}
-                            onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
-                            style={{
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              border: '1px solid rgba(255,255,255,0.3)',
-                              background: 'rgba(255,255,255,0.1)',
-                              color: '#fff',
-                              fontFamily: 'Segoe UI, Arial, sans-serif',
-                              direction: 'rtl'
-                            }}
-                          >
-                            <option value="viewer">צופה</option>
-                            <option value="editor">עורך</option>
-                            <option value="admin">מנהל</option>
-                          </select>
+                          <div className="action-dropdown" style={{ position: 'relative' }}>
+                            <button
+                              className="btn ghost"
+                              onClick={() => setEditingRoleDropdown(editingUser.id === editingRoleDropdown ? null : editingUser.id)}
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                border: '1px solid rgba(255,255,255,0.3)',
+                                background: 'rgba(255,255,255,0.1)',
+                                color: '#fff',
+                                fontFamily: 'Segoe UI, Arial, sans-serif',
+                                direction: 'rtl',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                textAlign: 'right',
+                                minWidth: '80px'
+                              }}
+                            >
+                              <span>{getRoleDisplayName(editingUser.role)}</span>
+                              <span style={{ fontSize: '8px', opacity: 0.7 }}>▼</span>
+                            </button>
+                            {editingRoleDropdown === editingUser.id && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                background: 'rgba(0,0,0,0.9)',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                borderRadius: '4px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                                zIndex: 1000,
+                                marginTop: '4px',
+                                minWidth: '80px'
+                              }}>
+                                {(['viewer', 'editor', 'admin'] as UserRole[]).map((role) => (
+                                  <button
+                                    key={role}
+                                    onClick={() => {
+                                      setEditingUser({ ...editingUser, role })
+                                      setEditingRoleDropdown(null)
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '4px 8px',
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#fff',
+                                      fontFamily: 'Segoe UI, Arial, sans-serif',
+                                      cursor: 'pointer',
+                                      textAlign: 'right',
+                                      direction: 'rtl',
+                                      borderBottom: role !== 'admin' ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                                      fontSize: '12px'
+                                    }}
+                                    onMouseOver={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'rgba(124,192,255,0.1)'
+                                    }}
+                                    onMouseOut={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'transparent'
+                                    }}
+                                  >
+                                    {getRoleDisplayName(role)}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                           <button 
                             className="btn primary"
                             onClick={handleSaveEdit}

@@ -1,58 +1,33 @@
-// Authentication configuration and switching logic
+// Authentication configuration for server-based authentication
+// This configuration is used for the closed network environment
 
-export type AuthMode = 'local' | 'adfs'
+// Server authentication endpoint
+export const AUTH_SERVER_URL = import.meta.env.VITE_AUTH_SERVER_URL || 'https://your-auth-server.com/api'
 
-// Get current authentication mode from environment or localStorage
+// Authentication mode (now only server-based)
+export type AuthMode = 'server'
+
+// Get current authentication mode
 export const getAuthMode = (): AuthMode => {
-  // Check if user has manually set auth mode in localStorage
-  const savedMode = localStorage.getItem('auth_mode')
-  if (savedMode && (savedMode === 'local' || savedMode === 'adfs')) {
-    return savedMode as AuthMode
-  }
-  
-  // Auto-detect based on environment variables
-  if (import.meta.env.VITE_ADFS_CLIENT_ID && import.meta.env.VITE_ADFS_AUTHORITY) {
-    return 'adfs'
-  }
-  
-  return 'local'
+  return 'server'
 }
 
-// Set authentication mode
+// Set authentication mode (simplified for server-based auth)
 export const setAuthMode = (mode: AuthMode) => {
   localStorage.setItem('auth_mode', mode)
-  
-  // Show status message
-  window.dispatchEvent(new CustomEvent('excel:status', { 
-    detail: { 
-      message: mode === 'adfs' 
-        ? 'עבר למצב אימות ADFS - נא לרענן את הדף'
-        : 'עבר למצב אימות מקומי - נא לרענן את הדף', 
-      type: 'ok', 
-      durationMs: 4000 
-    } 
-  }))
-}
-
-// Check if ADFS is available
-export const isAdfsAvailable = (): boolean => {
-  return !!(import.meta.env.VITE_ADFS_CLIENT_ID && import.meta.env.VITE_ADFS_AUTHORITY)
 }
 
 // Get authentication mode display name
 export const getAuthModeDisplayName = (mode: AuthMode): string => {
   switch (mode) {
-    case 'local':
-      return 'אימות מקומי'
-    case 'adfs':
-      return 'אימות ADFS'
+    case 'server':
+      return 'אימות שרת'
     default:
       return 'לא ידוע'
   }
 }
 
-// Check if switching between modes is allowed
+// Check if switching between modes is allowed (always false for server-only)
 export const canSwitchAuthMode = (): boolean => {
-  // Allow switching only if ADFS is configured
-  return isAdfsAvailable()
+  return false
 }

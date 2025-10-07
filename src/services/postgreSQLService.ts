@@ -325,6 +325,7 @@ class PostgreSQLService {
       throw new Error('Database not connected')
     }
 
+    
     try {
       await this.pool.query('DELETE FROM sagachim_status WHERE id = $1', [id])
     } catch (error) {
@@ -413,6 +414,34 @@ class PostgreSQLService {
    */
   isDatabaseConnected(): boolean {
     return this.isConnected && this.pool !== null && Pool !== null && Client !== null
+  }
+
+  /**
+   * Refresh connection state by testing the connection
+   */
+  async refreshConnectionState(): Promise<boolean> {
+    if (!Pool || !Client) {
+      this.isConnected = false
+      return false
+    }
+
+    if (!this.pool) {
+      this.isConnected = false
+      return false
+    }
+
+    try {
+      // Test the connection with a simple query
+      const client = await this.pool.connect()
+      await client.query('SELECT 1')
+      client.release()
+      this.isConnected = true
+      return true
+    } catch (error) {
+      console.error('❌ Connection test failed:', error)
+      this.isConnected = false
+      return false
+    }
   }
 
   /**

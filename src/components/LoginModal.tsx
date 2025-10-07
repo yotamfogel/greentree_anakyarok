@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { usePermissions, UserRole, getRoleDisplayName } from '../contexts/PermissionContext'
-import { getAuthMode, getAuthModeDisplayName, canSwitchAuthMode, setAuthMode } from '../config/authConfig'
+import { getAuthMode, getAuthModeDisplayName } from '../config/authConfig'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -8,65 +8,65 @@ interface LoginModalProps {
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
-  const { login, loginWithAdfs, isLoading, authMode, canSwitchAuthMode: canSwitch } = usePermissions()
+  const { login, isLoading, authMode, error } = usePermissions()
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    role: 'viewer' as UserRole
+    username: '',
+    password: ''
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!formData.name.trim()) {
-      window.dispatchEvent(new CustomEvent('excel:status', { 
-        detail: { 
-          message: 'אנא הזן שם משתמש', 
-          type: 'error', 
-          durationMs: 3000 
-        } 
+
+    if (!formData.username.trim()) {
+      window.dispatchEvent(new CustomEvent('excel:status', {
+        detail: {
+          message: 'אנא הזן שם משתמש',
+          type: 'error',
+          durationMs: 3000
+        }
+      }))
+      return
+    }
+
+    if (!formData.password.trim()) {
+      window.dispatchEvent(new CustomEvent('excel:status', {
+        detail: {
+          message: 'אנא הזן סיסמה',
+          type: 'error',
+          durationMs: 3000
+        }
       }))
       return
     }
 
     try {
-      // Check for demo admin account
-      if (formData.name.trim() === 'admin' && formData.password === 'admin') {
-        await login({
-          name: 'מנהל מערכת',
-          email: 'admin@system.com',
-          role: 'admin'
-        })
+      const success = await login(formData.username, formData.password)
+      if (success) {
         onClose()
-        setFormData({ name: '', email: '', password: '', role: 'viewer' })
-        return
+        // Reset form
+        setFormData({ username: '', password: '' })
+      } else if (error) {
+        window.dispatchEvent(new CustomEvent('excel:status', {
+          detail: {
+            message: error,
+            type: 'error',
+            durationMs: 3000
+          }
+        }))
       }
-
-      await login(formData) 
-      onClose()
-      // Reset form
-      setFormData({ name: '', email: '', password: '', role: 'viewer' })
     } catch (error) {
       console.error('Login failed:', error)
+      window.dispatchEvent(new CustomEvent('excel:status', {
+        detail: {
+          message: 'שגיאה בהתחברות לשרת',
+          type: 'error',
+          durationMs: 3000
+        }
+      }))
     }
   }
 
-  const handleAdfsLogin = async () => {
-    try {
-      await loginWithAdfs()
-      onClose()
-    } catch (error) {
-      console.error('ADFS login failed:', error)
-    }
-  }
-
-  const handleAuthModeSwitch = () => {
-    const newMode = authMode === 'local' ? 'adfs' : 'local'
-    setAuthMode(newMode)
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
@@ -141,118 +141,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Authentication Mode Switcher */}
-        {canSwitch && (
-          <div style={{
-            marginBottom: '20px',
-            textAlign: 'center',
-            direction: 'rtl'
-          }}>
-            <button
-              type="button"
-              onClick={handleAuthModeSwitch}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: '1px solid var(--accent)',
-                backgroundColor: 'transparent',
-                color: 'var(--accent)',
-                fontSize: '12px',
-                fontFamily: 'Segoe UI, Arial, sans-serif',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--accent)'
-                e.currentTarget.style.color = 'white'
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent'
-                e.currentTarget.style.color = 'var(--accent)'
-              }}
-            >
-              עבור ל{authMode === 'local' ? 'אימות ADFS' : 'אימות מקומי'}
-            </button>
-          </div>
-        )}
-
-        {/* ADFS Authentication */}
-        {authMode === 'adfs' && (
-          <div style={{ direction: 'rtl', textAlign: 'center', marginBottom: '20px' }}>
-            <button
-              type="button"
-              onClick={handleAdfsLogin}
-              disabled={isLoading}
-              style={{
-                width: '100%',
-                padding: '16px',
-                borderRadius: '8px',
-                border: 'none',
-                backgroundColor: isLoading ? 'var(--muted)' : '#0078d4',
-                color: 'white',
-                fontSize: '16px',
-                fontFamily: 'Segoe UI, Arial, sans-serif',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                transition: 'background-color 0.2s',
-                fontWeight: '600'
-              }}
-            >
-              {isLoading ? 'מתחבר...' : 'התחבר עם ADFS'}
-            </button>
-            <div style={{
-              fontSize: '12px',
-              color: 'var(--muted)',
-              marginTop: '8px'
-            }}>
-              תועבר לדף ההתחברות של ADFS
-            </div>
-            
-            {/* Local Login Option in ADFS Mode */}
-            <div style={{
-              marginTop: '16px',
-              padding: '12px',
-              backgroundColor: 'rgba(124, 192, 255, 0.1)',
-              borderRadius: '8px',
-              border: '1px solid rgba(124, 192, 255, 0.2)'
-            }}>
-              <div style={{
-                fontSize: '12px',
-                color: 'var(--muted)',
-                marginBottom: '8px'
-              }}>
-                או התחבר עם חשבון מקומי:
-              </div>
-              <button
-                type="button"
-                onClick={handleAuthModeSwitch}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--accent)',
-                  backgroundColor: 'transparent',
-                  color: 'var(--accent)',
-                  fontSize: '12px',
-                  fontFamily: 'Segoe UI, Arial, sans-serif',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--accent)'
-                  e.currentTarget.style.color = 'white'
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                  e.currentTarget.style.color = 'var(--accent)'
-                }}
-              >
-                עבור לאימות מקומי
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Local Authentication Form */}
-        {authMode === 'local' && (
+        {/* Server Authentication Form */}
           <form onSubmit={handleSubmit} style={{ direction: 'rtl' }}>
           <div style={{ marginBottom: '20px' }}>
             <label style={{
@@ -266,79 +155,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             </label>
             <input
               type="text"
-              name="name"
-              value={formData.name}
+              name="username"
+              value={formData.username}
               onChange={handleInputChange}
               placeholder="הזן שם משתמש"
               required
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '8px',
-                border: '2px solid var(--border)',
-                backgroundColor: 'var(--bg)',
-                color: 'var(--text)',
-                fontSize: '14px',
-                fontFamily: 'Segoe UI, Arial, sans-serif',
-                direction: 'rtl',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.2s'
-              }}
-              onFocus={(e) => e.currentTarget.style.borderColor = 'var(--accent)'}
-              onBlur={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
-            />
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              color: 'var(--text)',
-              fontWeight: '500',
-              fontSize: '14px'
-            }}>
-              סיסמה (אופציונלי)
-            </label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              placeholder="הזן סיסמה"
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '8px',
-                border: '2px solid var(--border)',
-                backgroundColor: 'var(--bg)',
-                color: 'var(--text)',
-                fontSize: '14px',
-                fontFamily: 'Segoe UI, Arial, sans-serif',
-                direction: 'rtl',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.2s'
-              }}
-              onFocus={(e) => e.currentTarget.style.borderColor = 'var(--accent)'}
-              onBlur={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
-            />
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              color: 'var(--text)',
-              fontWeight: '500',
-              fontSize: '14px'
-            }}>
-              כתובת אימייל (אופציונלי)
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              placeholder="הזן כתובת אימייל"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -365,12 +186,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               fontWeight: '500',
               fontSize: '14px'
             }}>
-              הרשאות
+              סיסמה *
             </label>
-            <select
-              name="role"
-              value={formData.role}
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
               onChange={handleInputChange}
+              placeholder="הזן סיסמה"
+              required
               style={{
                 width: '100%',
                 padding: '12px',
@@ -386,11 +210,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               }}
               onFocus={(e) => e.currentTarget.style.borderColor = 'var(--accent)'}
               onBlur={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
-            >
-              <option value="viewer">צופה - צפייה בלבד</option>
-              <option value="editor">עורך - הוספת הודעות</option>
-              <option value="admin">מנהל - הרשאות מלאות</option>
-            </select>
+            />
           </div>
 
           <div style={{
@@ -444,7 +264,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             </button>
           </div>
           </form>
-        )}
 
         <div style={{
           marginTop: '20px',
@@ -454,60 +273,31 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           border: '1px solid rgba(124, 192, 255, 0.2)',
           direction: 'rtl'
         }}>
-          {authMode === 'local' ? (
-            <>
-              <h4 style={{
-                margin: '0 0 8px 0',
-                color: 'var(--text)',
-                fontSize: '14px',
-                fontWeight: '600'
-              }}>
-                הסבר על הרשאות:
-              </h4>
-              <div style={{
-                fontSize: '12px',
-                color: 'var(--muted)',
-                lineHeight: '1.4'
-              }}>
-                <div><strong>צופה:</strong> צפייה בלבד בסג"חים</div>
-                <div><strong>עורך:</strong> הוספת הודעות בצ'אט</div>
-                <div><strong>מנהל:</strong> עריכת סטטוסים, יצירת סג"חים, הודעות וניהול משתמשים</div>
-                <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(124, 192, 255, 0.3)' }}>
-                  <div style={{ color: 'var(--accent)', fontWeight: '600' }}>חשבון מנהל לדמו:</div>
-                  <div>שם משתמש: <strong>admin</strong></div>
-                  <div>סיסמה: <strong>admin</strong></div>
-                </div>
+          <h4 style={{
+            margin: '0 0 8px 0',
+            color: 'var(--text)',
+            fontSize: '14px',
+            fontWeight: '600'
+          }}>
+            אימות שרת:
+          </h4>
+          <div style={{
+            fontSize: '12px',
+            color: 'var(--muted)',
+            lineHeight: '1.4'
+          }}>
+            <div>ההתחברות מתבצעת לשרת האימות המרכזי ברשת הסגורה</div>
+            <div>ההרשאות נקבעות אוטומטית על בסיס פרטי המשתמש בשרת</div>
+            <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(124, 192, 255, 0.3)' }}>
+              <div style={{ color: 'var(--accent)', fontWeight: '600' }}>חשבונות דמו לבדיקה:</div>
+              <div><strong>מנהל:</strong> admin / admin</div>
+              <div><strong>עורך:</strong> editor / editor</div>
+              <div><strong>צופה:</strong> viewer / viewer</div>
+              <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--muted)' }}>
+                או השתמש בשם המשתמש והסיסמה שקיבלת מהמנהל המערכת
               </div>
-            </>
-          ) : (
-            <>
-              <h4 style={{
-                margin: '0 0 8px 0',
-                color: 'var(--text)',
-                fontSize: '14px',
-                fontWeight: '600'
-              }}>
-                אימות ADFS:
-              </h4>
-              <div style={{
-                fontSize: '12px',
-                color: 'var(--muted)',
-                lineHeight: '1.4'
-              }}>
-                <div>ההרשאות נקבעות אוטומטית על פי חברות בקבוצות Active Directory:</div>
-                <div><strong>מנהלים:</strong> admin, admins, Administrators</div>
-                <div><strong>עורכים:</strong> editor, editors, Writers</div>
-                <div><strong>צופים:</strong> כל המשתמשים האחרים</div>
-                {canSwitch && (
-                  <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(124, 192, 255, 0.3)' }}>
-                    <div style={{ color: 'var(--accent)', fontWeight: '600' }}>
-                      ניתן לעבור בין מצבי אימות בלחיצה על הכפתור למעלה
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

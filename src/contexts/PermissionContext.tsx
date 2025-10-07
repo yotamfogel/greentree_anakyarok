@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { getAuthMode, AuthMode } from '../config/authConfig'
-import { adfsLogin, adfsLogout, getCurrentAdfsUser, initializeAdfs } from '../services/adfsAuthService'
+import { useServerAuth } from '../services/serverAuthService'
 
 // User roles with different permission levels
 export type UserRole = 'viewer' | 'editor' | 'admin'
@@ -35,9 +35,8 @@ interface User {
 
 interface PermissionContextType {
   user: User | null
-  login: (userData: Partial<User>) => Promise<void>
-  loginWithAdfs: () => Promise<void>
-  logout: () => void
+  login: (username: string, password: string) => Promise<boolean>
+  logout: () => Promise<void>
   hasPermission: (permission: Permission) => boolean
   hasRole: (role: UserRole) => boolean
   canEditStatus: () => boolean
@@ -49,6 +48,7 @@ interface PermissionContextType {
   isLoading: boolean
   authMode: AuthMode
   canSwitchAuthMode: boolean
+  error: string | null
 }
 
 const PermissionContext = createContext<PermissionContextType | undefined>(undefined)
@@ -58,182 +58,37 @@ interface PermissionProviderProps {
 }
 
 export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const [authMode] = useState<AuthMode>(() => getAuthMode())
+  const serverAuth = useServerAuth()
 
-  // Load user from localStorage or ADFS on mount
+  // Save user to localStorage whenever user changes (for compatibility)
   useEffect(() => {
-    const initializeAuth = async () => {
-      setIsLoading(true)
+    if (serverAuth.user) {
       try {
-        if (authMode === 'adfs') {
-          // Try to restore ADFS user session
-          const adfsUser = await initializeAdfs()
-          if (adfsUser) {
-            setUser(adfsUser)
-            return
-          }
-        }
-        
-        // Fallback to local storage for local auth or when ADFS fails
-        const savedUser = localStorage.getItem('user')
-        if (savedUser) {
-          const userData = JSON.parse(savedUser) as User
-          // Ensure authMode is set correctly
-          userData.authMode = authMode
-          setUser(userData)
-        }
-      } catch (error) {
-        console.error('Failed to initialize authentication:', error)
-        localStorage.removeItem('user')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    initializeAuth()
-  }, [authMode])
-
-  // Save user to localStorage whenever user changes
-  useEffect(() => {
-    if (user) {
-      try {
-        localStorage.setItem('user', JSON.stringify(user))
+        localStorage.setItem('user', JSON.stringify(serverAuth.user))
       } catch (error) {
         console.error('Failed to save user to localStorage:', error)
       }
     } else {
       localStorage.removeItem('user')
     }
-  }, [user])
+  }, [serverAuth.user])
 
-  const login = async (userData: Partial<User>) => {
-    setIsLoading(true)
-    try {
-      // Simulate API call for local authentication
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      // For local authentication, create a user with the provided data
-      const newUser: User = {
-        id: userData.id || `user_${Date.now()}`,
-        name: userData.name || 'משתמש',
-        email: userData.email || 'user@example.com',
-        role: userData.role || 'viewer',
-        lastLogin: new Date().toISOString(),
-        authMode: 'local'
-      }
-      
-      setUser(newUser)
-      
-      // If user is admin, add them to the admin users list
-      if (newUser.role === 'admin') {
-        try {
-          const existingUsers = localStorage.getItem('admin_users')
-          const users = existingUsers ? JSON.parse(existingUsers) : []
-          const userExists = users.some((u: User) => u.id === newUser.id || u.email === newUser.email)
-          
-          if (!userExists) {
-            users.push(newUser)
-            localStorage.setItem('admin_users', JSON.stringify(users))
-          }
-        } catch (error) {
-          console.error('Failed to add admin user to list:', error)
-        }
-      }
-      
-      // Show success message
-      window.dispatchEvent(new CustomEvent('excel:status', { 
-        detail: { 
-          message: `ברוך הבא, ${newUser.name}!`, 
-          type: 'ok', 
-          durationMs: 3000 
-        } 
-      }))
-    } catch (error) {
-      console.error('Local login failed:', error)
-      window.dispatchEvent(new CustomEvent('excel:status', { 
-        detail: { 
-          message: 'שגיאה בהתחברות מקומית', 
-          type: 'error', 
-          durationMs: 3000 
-        } 
-      }))
-    } finally {
-      setIsLoading(false)
-    }
+  const login = async (username: string, password: string): Promise<boolean> => {
+    return await serverAuth.login(username, password)
   }
 
-  const loginWithAdfs = async () => {
-    setIsLoading(true)
-    try {
-      const result = await adfsLogin()
-      const adfsUser = await getCurrentAdfsUser()
-      
-      if (adfsUser) {
-        setUser(adfsUser)
-        
-        // Show success message
-        window.dispatchEvent(new CustomEvent('excel:status', { 
-          detail: { 
-            message: `ברוך הבא, ${adfsUser.name}!`, 
-            type: 'ok', 
-            durationMs: 3000 
-          } 
-        }))
-      } else {
-        throw new Error('Failed to get user information from ADFS')
-      }
-    } catch (error) {
-      console.error('ADFS login failed:', error)
-      window.dispatchEvent(new CustomEvent('excel:status', { 
-        detail: { 
-          message: 'שגיאה בהתחברות ADFS', 
-          type: 'error', 
-          durationMs: 3000 
-        } 
-      }))
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const logout = async () => {
-    try {
-      // Handle ADFS logout if user is authenticated via ADFS
-      if (user?.authMode === 'adfs') {
-        await adfsLogout()
-      }
-      
-      setUser(null)
-      window.dispatchEvent(new CustomEvent('excel:status', { 
-        detail: { 
-          message: 'התנתקת בהצלחה', 
-          type: 'ok', 
-          durationMs: 2000 
-        } 
-      }))
-    } catch (error) {
-      console.error('Logout failed:', error)
-      // Still clear local user state even if ADFS logout fails
-      setUser(null)
-      window.dispatchEvent(new CustomEvent('excel:status', { 
-        detail: { 
-          message: 'התנתקת (עם שגיאות)', 
-          type: 'warn', 
-          durationMs: 3000 
-        } 
-      }))
-    }
+  const logout = async (): Promise<void> => {
+    await serverAuth.logout()
   }
 
   const hasPermission = (permission: Permission): boolean => {
-    if (!user) return false
-    return ROLE_PERMISSIONS[user.role].includes(permission)
+    if (!serverAuth.user) return false
+    return ROLE_PERMISSIONS[serverAuth.user.role].includes(permission)
   }
 
   const hasRole = (role: UserRole): boolean => {
-    return user?.role === role
+    return serverAuth.user?.role === role
   }
 
   const canEditStatus = (): boolean => {
@@ -258,14 +113,13 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
 
   const canValidateJson = (): boolean => {
     const result = hasPermission('validate_json')
-    console.log('canValidateJson called:', { user: user?.role, result })
+    console.log('canValidateJson called:', { user: serverAuth.user?.role, result })
     return result
   }
 
   const value: PermissionContextType = {
-    user,
+    user: serverAuth.user,
     login,
-    loginWithAdfs,
     logout,
     hasPermission,
     hasRole,
@@ -275,9 +129,10 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     canChat,
     canManageUsers,
     canValidateJson,
-    isLoading,
+    isLoading: serverAuth.isLoading,
     authMode,
-    canSwitchAuthMode: !!(import.meta.env.VITE_ADFS_CLIENT_ID && import.meta.env.VITE_ADFS_AUTHORITY)
+    canSwitchAuthMode: false, // Always false for server-only auth
+    error: serverAuth.error
   }
 
   return (

@@ -148,6 +148,7 @@ interface SagachDataContextType {
   // Database status
   useDatabase: boolean
   isDatabaseConnected: boolean
+  refreshDatabaseConnection: () => void
 
   // Real-time updates
   subscribeToChanges: (callback: (event: DataChangeEvent) => void) => () => void
@@ -179,6 +180,7 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
   const [changeListeners, setChangeListeners] = useState<Set<(event: DataChangeEvent) => void>>(new Set())
   const [dbService, setDbService] = useState<any>(null)
   const [useDatabase, setUseDatabase] = useState(false)
+  const [isDatabaseConnected, setIsDatabaseConnected] = useState(false)
 
   // Migration function to add missing fields to old data
   const migrateSagachData = (data: any[]): SagachTable[] => {
@@ -289,10 +291,12 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
           await databaseService.createTables()
           databaseAvailable = true
           setUseDatabase(true)
+          setIsDatabaseConnected(databaseService.isDatabaseConnected())
           console.log('💾 Using PostgreSQL database for data storage')
         } catch (dbError) {
           console.warn('⚠️ PostgreSQL not available, falling back to localStorage:', dbError)
           setUseDatabase(false)
+          setIsDatabaseConnected(false)
           databaseAvailable = false
         }
 
@@ -385,6 +389,31 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
     initializeAndLoadData()
   }, [])
 
+  // Track database connection state changes
+  useEffect(() => {
+    if (dbService) {
+      const checkConnection = async () => {
+        try {
+          const connected = await dbService.refreshConnectionState()
+          setIsDatabaseConnected(connected)
+        } catch (error) {
+          console.error('❌ Periodic connection check failed:', error)
+          setIsDatabaseConnected(false)
+        }
+      }
+
+      // Check connection immediately
+      checkConnection()
+
+      // Set up periodic connection check (every 5 seconds)
+      const intervalId = setInterval(checkConnection, 5000)
+
+      return () => clearInterval(intervalId)
+    } else {
+      setIsDatabaseConnected(false)
+    }
+  }, [dbService])
+
 
   // Listen for storage changes from other tabs/windows
   useEffect(() => {
@@ -412,8 +441,10 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
 
   // Sagach Manager functions
   const addSagach = useCallback((sagachData: Omit<SagachTable, 'createdBy' | 'createdAt' | 'lastModifiedBy' | 'lastModifiedAt'>) => {
+    // If user is not loaded yet, skip the creation silently (don't throw error)
+    // This prevents timing issues when components initialize before auth completes
     if (!user) {
-      setError('User must be logged in to create sagachs')
+      console.warn('⚠️ Attempted to create sagach before user authentication completed')
       return
     }
 
@@ -442,20 +473,22 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
   }, [user, saveData, emitChange])
 
   const updateSagach = useCallback((id: string, updates: Partial<SagachTable>) => {
+    // If user is not loaded yet, skip the update silently (don't throw error)
+    // This prevents timing issues when components initialize before auth completes
     if (!user) {
-      setError('User must be logged in to update sagachs')
+      console.warn('⚠️ Attempted to update sagach before user authentication completed')
       return
     }
 
     const now = new Date().toISOString()
     setSagachs(prev => {
-      const updated = prev.map(sagach => 
-        sagach.id === id 
-          ? { 
-              ...sagach, 
-              ...updates, 
-              lastModifiedBy: user.id, 
-              lastModifiedAt: now 
+      const updated = prev.map(sagach =>
+        sagach.id === id
+          ? {
+              ...sagach,
+              ...updates,
+              lastModifiedBy: user.id,
+              lastModifiedAt: now
             }
           : sagach
       )
@@ -473,8 +506,10 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
   }, [user, saveData, emitChange])
 
   const deleteSagach = useCallback(async (id: string) => {
+    // If user is not loaded yet, skip the deletion silently (don't throw error)
+    // This prevents timing issues when components initialize before auth completes
     if (!user) {
-      setError('User must be logged in to delete sagachs')
+      console.warn('⚠️ Attempted to delete sagach before user authentication completed')
       return
     }
 
@@ -506,8 +541,10 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
 
   // Sagachim Status functions
   const addSagachimStatus = useCallback((itemData: Omit<SagachimStatusItem, 'createdBy' | 'createdAt' | 'lastModifiedBy' | 'lastModifiedAt'>) => {
+    // If user is not loaded yet, skip the creation silently (don't throw error)
+    // This prevents timing issues when components initialize before auth completes
     if (!user) {
-      setError('User must be logged in to create status items')
+      console.warn('⚠️ Attempted to create status item before user authentication completed')
       return
     }
 
@@ -536,20 +573,22 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
   }, [user, saveData, emitChange])
 
   const updateSagachimStatus = useCallback((id: string, updates: Partial<SagachimStatusItem>) => {
+    // If user is not loaded yet, skip the update silently (don't throw error)
+    // This prevents timing issues when components initialize before auth completes
     if (!user) {
-      setError('User must be logged in to update status items')
+      console.warn('⚠️ Attempted to update status item before user authentication completed')
       return
     }
 
     const now = new Date().toISOString()
     setSagachimStatus(prev => {
-      const updated = prev.map(item => 
-        item.id === id 
-          ? { 
-              ...item, 
-              ...updates, 
-              lastModifiedBy: user.id, 
-              lastModifiedAt: now 
+      const updated = prev.map(item =>
+        item.id === id
+          ? {
+              ...item,
+              ...updates,
+              lastModifiedBy: user.id,
+              lastModifiedAt: now
             }
           : item
       )
@@ -567,8 +606,10 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
   }, [user, saveData, emitChange])
 
   const deleteSagachimStatus = useCallback(async (id: string) => {
+    // If user is not loaded yet, skip the deletion silently (don't throw error)
+    // This prevents timing issues when components initialize before auth completes
     if (!user) {
-      setError('User must be logged in to delete status items')
+      console.warn('⚠️ Attempted to delete status item before user authentication completed')
       return
     }
 
@@ -605,27 +646,27 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
       localStorage.removeItem(SAGACH_DATA_KEY)
       localStorage.removeItem(SAGACHIM_STATUS_KEY)
       localStorage.removeItem(DATA_CHANGES_KEY)
-      
+
       // Also clear old keys if they exist
       localStorage.removeItem(OLD_SAGACH_DATA_KEY)
       localStorage.removeItem(OLD_SAGACHIM_STATUS_KEY)
-      
+
       // Reset state
       setSagachs([])
       setSagachimStatus([])
       setError(null)
-      
+
       console.log('🗑️ All data cleared successfully')
     } catch (err) {
       console.error('Failed to clear data:', err)
       setError('Failed to clear data')
     }
-  }, [])
+  }, [setSagachs, setSagachimStatus, setError])
 
   // Subscribe to changes
   const subscribeToChanges = useCallback((callback: (event: DataChangeEvent) => void) => {
     setChangeListeners(prev => new Set([...prev, callback]))
-    
+
     return () => {
       setChangeListeners(prev => {
         const newSet = new Set(prev)
@@ -633,7 +674,21 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
         return newSet
       })
     }
-  }, [])
+  }, [setChangeListeners])
+
+  // Manual refresh of database connection state
+  const refreshDatabaseConnection = useCallback(async () => {
+    if (dbService) {
+      try {
+        const connected = await dbService.refreshConnectionState()
+        setIsDatabaseConnected(connected)
+        console.log('🔄 Database connection state refreshed:', connected)
+      } catch (error) {
+        console.error('❌ Failed to refresh database connection state:', error)
+        setIsDatabaseConnected(false)
+      }
+    }
+  }, [dbService])
 
   const value: SagachDataContextType = useMemo(() => ({
     sagachs,
@@ -646,7 +701,8 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
     deleteSagachimStatus,
     clearAllData,
     useDatabase,
-    isDatabaseConnected: dbService?.isDatabaseConnected() || false,
+    isDatabaseConnected,
+    refreshDatabaseConnection,
     subscribeToChanges,
     isLoading,
     error
@@ -661,7 +717,7 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
     deleteSagachimStatus,
     clearAllData,
     useDatabase,
-    dbService,
+    isDatabaseConnected,
     subscribeToChanges,
     isLoading,
     error

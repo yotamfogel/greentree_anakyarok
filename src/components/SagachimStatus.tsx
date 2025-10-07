@@ -129,6 +129,17 @@ export const SagachimStatus = memo(() => {
     }
   }, [isUserSubscribed])
 
+  // Helper function to safely handle arena field (ensures it's always an array)
+  const getArenaArray = useCallback((sagach: SagachimStatusItem): ArenaOption[] => {
+    if (Array.isArray(sagach.arena)) {
+      return sagach.arena
+    }
+    if (sagach.arena && typeof sagach.arena === 'string') {
+      return [sagach.arena as ArenaOption]
+    }
+    return []
+  }, [])
+
   const removeNotificationSubscriber = useCallback((sagach: SagachimStatusItem, userId: string): SagachimStatusItem => {
     const updatedSubscribers = (sagach.notificationSubscribers || []).filter(sub => sub.userId !== userId)
 
@@ -731,7 +742,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
       if (hasProviderFilter && sagach.provider !== selectedProvider) return false
 
       // Arena filter
-      if (hasArenaFilter && selectedArena && !sagach.arena.includes(selectedArena)) return false
+      if (hasArenaFilter && selectedArena && !getArenaArray(sagach).includes(selectedArena)) return false
 
       // Process status filter
       if (hasProcessStatusFilter && sagach.processStatus.toString() !== selectedProcessStatus) return false
@@ -2806,7 +2817,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                     fontSize: '12px',
                     color: 'var(--text)'
                   }}>
-                    {sagach.arena.join(', ')}
+                    {getArenaArray(sagach).join(', ')}
                   </span>
                 </div>
               </div>
@@ -3096,7 +3107,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                                     fontSize: '12px',
                                     color: 'var(--text)'
                                   }}>
-                                    {sagach.arena.join(', ')}
+                                    {getArenaArray(sagach).join(', ')}
                                   </span>
                                 </div>
                               </div>
@@ -3341,7 +3352,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                             fontSize: '12px',
                             color: 'var(--text)'
                           }}>
-                            {sagach.arena.join(', ')}
+                            {getArenaArray(sagach).join(', ')}
                           </span>
                         </div>
 
