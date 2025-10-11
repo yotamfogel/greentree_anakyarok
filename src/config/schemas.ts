@@ -47,7 +47,7 @@ export const availableSchemas: AvailableSchemas = {
                     required: ['name', 'keys'],
                     properties: {
                       name: { type: 'string', description: 'Shortcut action name' },
-                      keys: { type: 'string', description: 'Keyboard combination', pattern: '^[A-Z]+\+[A-Z]+$' }
+                      keys: { type: 'string', description: 'Keyboard combination', pattern: '^[A-Z]+\\+[A-Z]+$' }
                     }
                   }
                 }

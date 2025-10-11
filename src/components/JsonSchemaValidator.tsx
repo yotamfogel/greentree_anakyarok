@@ -759,7 +759,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                 outline: 'none',
                 resize: 'none',
                 lineHeight: '1.5',
-                height: '700px',
+                height: '800px',
                 direction: 'ltr',
                 textAlign: 'left',
               }}
@@ -776,7 +776,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                 width: '100%',
                 margin: '0',
                 padding: '32px',
-                height: '700px',
+                height: '800px',
                 overflow: 'auto',
                 direction: 'ltr',
                 textAlign: 'left'
@@ -785,10 +785,11 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
             <div style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '12px',
               marginBottom: '16px',
               paddingBottom: '12px',
-              borderBottom: '1px solid rgba(255,255,255,0.1)'
+              borderBottom: '1px solid rgba(255,255,255,0.1)',
             }}>
               <span style={{
                 fontSize: '24px',
@@ -800,7 +801,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                 fontSize: '20px',
                 fontWeight: '600',
                 color: 'var(--text)',
-                margin: 0
+                margin: 0,
               }}>
                 תוצאת בדיקת תקינות
               </h3>
@@ -813,9 +814,9 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                   fontSize: '16px',
                   fontWeight: '600',
                   color: 'var(--text)',
-                  margin: '0 0 12px 0'
+                  margin: '0 0 12px 0',
                 }}>
-                  JSON עם סימון שדות
+                  
                 </h4>
                 <div style={{
                   background: 'rgba(0,0,0,0.3)',
@@ -825,7 +826,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                   fontFamily: 'Monaco, Menlo, "DejaVu Sans Mono", monospace',
                   fontSize: '13px',
                   lineHeight: '1.6',
-                  maxHeight: '400px',
+                  height: '600px',
                   overflowY: 'auto'
                 }}>
                   <pre key={`json-display-${validationSnapshot ? 'snapshot' : 'empty'}`} style={{
@@ -842,8 +843,77 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                         const schema = availableSchemas[selectedSchema as keyof typeof availableSchemas]?.schema
                         const formattedJson = renderJsonWithHighlights(jsonData, validationResult?.errors || [], schema)
                         
+                        // Build a map of line numbers to their actual JSON paths
+                        const buildLineToPathMap = (jsonData: any, lines: string[]) => {
+                          const lineToPathMap = new Map<number, string>()
+                          let currentPath: string[] = []
+                          let braceStack: string[] = []
+                          let bracketStack: string[] = []
+                          
+                          lines.forEach((line, index) => {
+                            const trimmedLine = line.trim()
+                            
+                            // Track opening braces/brackets
+                            if (trimmedLine.endsWith('{')) {
+                              braceStack.push('{')
+                            }
+                            if (trimmedLine.endsWith('[')) {
+                              bracketStack.push('[')
+                            }
+                            
+                            // Track closing braces/brackets
+                            if (trimmedLine === '}' || trimmedLine.endsWith('},')) {
+                              if (braceStack.length > 0) braceStack.pop()
+                              if (currentPath.length > 0) currentPath.pop()
+                            }
+                            if (trimmedLine === ']' || trimmedLine.endsWith('],')) {
+                              if (bracketStack.length > 0) bracketStack.pop()
+                              if (currentPath.length > 0) currentPath.pop()
+                            }
+                            
+                            // Extract field name from lines like '"fieldName": value'
+                            const fieldMatch = trimmedLine.match(/^"([^"]+)":/)
+                            if (fieldMatch) {
+                              const fieldName = fieldMatch[1]
+                              const fullPath = currentPath.length > 0 ? [...currentPath, fieldName].join('.') : fieldName
+                              lineToPathMap.set(index, fullPath)
+                              
+                              // If this field opens an object or array, add it to the path
+                              if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[')) {
+                                currentPath.push(fieldName)
+                              }
+                            }
+                            
+                            // Handle array indices
+                            if (bracketStack.length > 0 && trimmedLine.match(/^\d+:/)) {
+                              const indexMatch = trimmedLine.match(/^(\d+):/)
+                              if (indexMatch) {
+                                const arrayIndex = indexMatch[1]
+                                const fullPath = currentPath.length > 0 ? [...currentPath, `[${arrayIndex}]`].join('.') : `[${arrayIndex}]`
+                                lineToPathMap.set(index, fullPath)
+                              }
+                            }
+                          })
+                          
+                          return lineToPathMap
+                        }
+
+                        // Create a function to determine if a line should be highlighted based on error path
+                        const shouldHighlightLine = (line: string, errorPath: string, lineIndex: number, lineToPathMap: Map<number, string>) => {
+                          // Get the actual path for this line
+                          const actualPath = lineToPathMap.get(lineIndex)
+                          if (!actualPath) return false
+                          
+                          // Check if this line's path matches the error path
+                          return actualPath === errorPath
+                        }
+
+                        // Build the line-to-path mapping
+                        const lines = formattedJson.split('\n')
+                        const lineToPathMap = buildLineToPathMap(jsonData, lines)
+
                         // Split into lines and add highlighting
-                        return formattedJson.split('\n').map((line: string, lineIndex: number) => {
+                        return lines.map((line: string, lineIndex: number) => {
                           let highlightedLine = line
                           
                           // FIRST: Highlight missing fields (yellow background) - capture entire field including closing quote
@@ -863,14 +933,16 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                           
                           // SECOND: Highlight error fields (red background) - but skip if already highlighted as missing
                           validationResult?.errors?.forEach(error => {
-                            const fieldName = error.path.split('.').pop()
-                            if (line.includes(`"${fieldName}"`) && !line.includes('[שדה חסר]')) {
-                              // Only highlight if it's NOT a missing field
-                              const keyValueRegex = new RegExp(`("${fieldName}"\\s*:\\s*[^,}\\]]*[",}])`, 'g')
-                              highlightedLine = highlightedLine.replace(
-                                keyValueRegex,
-                                '<span style="background: rgba(244,67,54,0.4); color: white; padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(244,67,54,0.6); font-weight: 500;">$1</span>'
-                              )
+                            if (shouldHighlightLine(line, error.path, lineIndex, lineToPathMap) && !line.includes('[שדה חסר]')) {
+                              const fieldName = error.path.split('.').pop()
+                              if (fieldName) {
+                                // Only highlight if it's NOT a missing field
+                                const keyValueRegex = new RegExp(`("${fieldName}"\\s*:\\s*[^,}\\]]*[",}])`, 'g')
+                                highlightedLine = highlightedLine.replace(
+                                  keyValueRegex,
+                                  '<span style="background: rgba(244,67,54,0.4); color: white; padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(244,67,54,0.6); font-weight: 500;">$1</span>'
+                                )
+                              }
                             }
                           })
                           
@@ -1037,7 +1109,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                 margin: '0',
                 marginTop: '0',
                 padding: '32px',
-                height: '700px',
+                height: '800px',
                 overflow: 'auto'
               }}>
                 {/* Errors Header */}
@@ -1047,22 +1119,25 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                   gap: '12px',
                   marginBottom: '16px',
                   paddingBottom: '12px',
-                  borderBottom: '1px solid rgba(255,255,255,0.1)'
+                  borderBottom: '1px solid rgba(255,255,255,0.1)',
+                  justifyContent: 'center',
                 }}>
+                  
+                  <h3 style={{
+                    fontSize: '20px',
+                    fontWeight: '600',
+                    color: 'var(--text)',
+                    justifyContent: 'center',
+                    margin: 0
+                  }}>
+                    שגיאות ({validationResult.errors.length})
+                  </h3>
                   <span style={{
                     fontSize: '24px',
                     color: '#f44336'
                   }}>
                     ❌
                   </span>
-                  <h3 style={{
-                    fontSize: '20px',
-                    fontWeight: '600',
-                    color: 'var(--text)',
-                    margin: 0
-                  }}>
-                    שגיאות ({validationResult.errors.length})
-                  </h3>
                 </div>
 
                 {/* Errors List */}
