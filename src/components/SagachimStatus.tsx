@@ -441,6 +441,63 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     return expectedDateOnly < currentDateOnly
   }, [currentDateOnly, parseEstimatedDate])
 
+  // Calculate how many days the sagach has been in its current stage
+  const getDaysInCurrentStage = useCallback((sagach: SagachimStatusItem): number | null => {
+    const currentStatus = sagach.processStatus
+    const phaseData = sagach.phaseData?.[currentStatus]
+    
+    if (!phaseData?.currentEntry?.startDate) {
+      return null
+    }
+
+    try {
+      const startDate = new Date(phaseData.currentEntry.startDate)
+      // Reset time to start of day for accurate day counting
+      const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
+      const today = new Date(currentDateOnly.getFullYear(), currentDateOnly.getMonth(), currentDateOnly.getDate())
+      
+      const diffTime = today.getTime() - startDateOnly.getTime()
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+      
+      // Add 1 so that if something starts today (diffDays = 0), it shows as "1 day"
+      // Started today = 1 day, started yesterday = 2 days, etc.
+      return diffDays + 1
+    } catch {
+      return null
+    }
+  }, [currentDateOnly])
+
+  // Get the color for the stage duration label
+  const getStageDurationColor = useCallback((days: number | null): { background: string; color: string } | null => {
+    if (days === null) return null
+    
+    if (days < 7) {
+      // Green for less than 7 days
+      return {
+        background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.9), rgba(56, 142, 60, 0.8))',
+        color: '#ffffff'
+      }
+    } else if (days < 14) {
+      // Yellow for 8-14 days
+      return {
+        background: 'linear-gradient(135deg, rgba(255, 235, 59, 0.9), rgba(253, 216, 53, 0.8))',
+        color: '#1f1f1f'
+      }
+    } else if (days < 30) {
+      // Orange for 14-30 days
+      return {
+        background: 'linear-gradient(135deg, rgba(255, 152, 0, 0.9), rgba(251, 140, 0, 0.8))',
+        color: '#1f1f1f'
+      }
+    } else {
+      // Red for 30+ days
+      return {
+        background: 'linear-gradient(135deg, rgba(244, 67, 54, 0.9), rgba(229, 57, 53, 0.8))',
+        color: '#ffffff'
+      }
+    }
+  }, [])
+
   // Update current date when mock date changes
   useEffect(() => {
     if (mockDate) {
@@ -1450,7 +1507,29 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     if (!dateString) return 'לא צוין'
     
     try {
-      const date = new Date(dateString)
+      let date: Date
+      
+      // Check if it's already in dd/MM/yyyy format
+      if (typeof dateString === 'string' && dateString.includes('/')) {
+        const parts = dateString.split(' ')
+        const datePart = parts[0]
+        const timePart = parts[1] || '00:00:00'
+        const dateComponents = datePart.split('/')
+        
+        if (dateComponents.length === 3) {
+          // Parse as dd/MM/yyyy
+          const day = dateComponents[0]
+          const month = dateComponents[1]
+          const year = dateComponents[2]
+          // Create date from yyyy-MM-dd format to avoid ambiguity
+          date = new Date(`${year}-${month}-${day}T${timePart}`)
+        } else {
+          date = new Date(dateString)
+        }
+      } else {
+        date = new Date(dateString)
+      }
+      
       if (isNaN(date.getTime())) return dateString // Return original if invalid
       
       const hours = date.getHours().toString().padStart(2, '0')
@@ -2640,6 +2719,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                     {phaseSagachim.map(sagach => {
                       const isOverdue = isSagachOverdue(sagach)
                       const isCompleted = sagach.processStatus === 7
+                      const daysInStage = getDaysInCurrentStage(sagach)
+                      const stageDurationColor = getStageDurationColor(daysInStage)
                       
                       // Log for debugging - only for specific sagach
                       if (sagach.name === 'dsa') {
@@ -2673,14 +2754,14 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                                 : isOverdue
                                 ? '0 8px 32px rgba(255,165,0,0.4), inset 0 1px 0 rgba(255,165,0,0.2)'
                                 : '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
-              backdropFilter: 'blur(8px)',
-              transition: 'all 0.3s ease',
-              cursor: 'pointer',
-              position: 'relative',
-              overflow: 'hidden',
-              width: '100%',
-              maxWidth: '320px'
-            }}
+                              backdropFilter: 'blur(8px)',
+                              transition: 'all 0.3s ease',
+                              cursor: 'pointer',
+                              position: 'relative',
+                              overflow: 'hidden',
+                              width: '100%',
+                              maxWidth: '320px'
+                            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-4px)'
               e.currentTarget.style.boxShadow = isCompleted
@@ -2723,6 +2804,30 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                 : PROCESS_STEPS[sagach.processStatus - 1]
               }
             </div>
+
+            {/* Stage Duration Label - Bottom Left */}
+            {stageDurationColor && daysInStage !== null && (
+              <div style={{
+                position: 'absolute',
+                bottom: '12px',
+                left: '12px',
+                background: stageDurationColor.background,
+                color: stageDurationColor.color,
+                padding: '4px 8px',
+                borderRadius: '8px',
+                fontSize: '9px',
+                fontWeight: '700',
+                letterSpacing: '0.3px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
+                direction: 'rtl',
+                zIndex: 10
+              }}>
+                {daysInStage} ימים בשלב הנוכחי
+              </div>
+            )}
 
             {isOverdue && (
               <div style={{
@@ -2914,6 +3019,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                         {phaseSagachim.map(sagach => {
                           const isOverdue = isSagachOverdue(sagach)
                           const isCompleted = sagach.processStatus === 7
+                          const daysInStage = getDaysInCurrentStage(sagach)
+                          const stageDurationColor = getStageDurationColor(daysInStage)
                           
                           console.log(`🎨 Rendering card for ${sagach.name}:`)
                           console.log(`  isOverdue: ${isOverdue}`)
@@ -2993,6 +3100,30 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                                 : PROCESS_STEPS[sagach.processStatus - 1]
                               }
                             </div>
+
+                            {/* Stage Duration Label - Bottom Left */}
+                            {stageDurationColor && daysInStage !== null && (
+                              <div style={{
+                                position: 'absolute',
+                                bottom: '12px',
+                                left: '12px',
+                                background: stageDurationColor.background,
+                                color: stageDurationColor.color,
+                                padding: '4px 8px',
+                                borderRadius: '8px',
+                                fontSize: '9px',
+                                fontWeight: '700',
+                                letterSpacing: '0.3px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
+                                direction: 'rtl',
+                                zIndex: 10
+                              }}>
+                                {daysInStage} ימים בשלב הנוכחי
+                              </div>
+                            )}
 
                             {isOverdue && (
                               <div style={{
@@ -3165,6 +3296,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                 {filteredSagachim.map(sagach => {
                   const isOverdue = isSagachOverdue(sagach)
                   const isCompleted = sagach.processStatus === 7
+                  const daysInStage = getDaysInCurrentStage(sagach)
+                  const stageDurationColor = getStageDurationColor(daysInStage)
                   
                   return (
                   <div
@@ -3238,6 +3371,30 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                         : PROCESS_STEPS[sagach.processStatus - 1]
                       }
                     </div>
+
+                    {/* Stage Duration Label - Bottom Left */}
+                    {stageDurationColor && daysInStage !== null && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '12px',
+                        left: '12px',
+                        background: stageDurationColor.background,
+                        color: stageDurationColor.color,
+                        padding: '4px 8px',
+                        borderRadius: '8px',
+                        fontSize: '9px',
+                        fontWeight: '700',
+                        letterSpacing: '0.3px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
+                        direction: 'rtl',
+                        zIndex: 10
+                      }}>
+                        {daysInStage} ימים בשלב הנוכחי
+                      </div>
+                    )}
 
                     {sagach.priority === 'TOP' && (
                       <div style={{
@@ -3393,6 +3550,25 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                             color: 'var(--text)'
                           }}>
                             {(() => {
+                              // Check if it's already in dd/MM/yyyy format
+                              if (typeof sagach.lastUpdated === 'string' && sagach.lastUpdated.includes('/')) {
+                                const parts = sagach.lastUpdated.split('/')
+                                if (parts.length === 3) {
+                                  // If it's stored as dd/MM/yyyy, parse it correctly
+                                  const day = parts[0]
+                                  const month = parts[1]
+                                  const year = parts[2]
+                                  // Create date from yyyy-MM-dd format to avoid ambiguity
+                                  const date = new Date(`${year}-${month}-${day}`)
+                                  if (!isNaN(date.getTime())) {
+                                    const d = date.getDate().toString().padStart(2, '0')
+                                    const m = (date.getMonth() + 1).toString().padStart(2, '0')
+                                    const y = date.getFullYear()
+                                    return `${d}/${m}/${y}`
+                                  }
+                                }
+                              }
+                              // Fallback to regular date parsing
                               const date = new Date(sagach.lastUpdated)
                               if (isNaN(date.getTime())) {
                                 return sagach.lastUpdated
@@ -3400,7 +3576,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                               const day = date.getDate().toString().padStart(2, '0')
                               const month = (date.getMonth() + 1).toString().padStart(2, '0')
                               const year = date.getFullYear()
-                              return `${day}.${month}.${year}`
+                              return `${day}/${month}/${year}`
                             })()}
                           </span>
                         </div>
