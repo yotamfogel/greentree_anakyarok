@@ -779,7 +779,12 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                 height: '800px',
                 overflow: 'auto',
                 direction: 'ltr',
-                textAlign: 'left'
+                textAlign: 'left',
+                willChange: 'transform',
+                contain: 'layout style paint',
+                transform: 'translateZ(0)',
+                isolation: 'isolate',
+                backfaceVisibility: 'hidden'
               }}>
             {/* Result Header */}
             <div style={{
@@ -827,7 +832,12 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                   fontSize: '13px',
                   lineHeight: '1.6',
                   height: '600px',
-                  overflowY: 'auto'
+                  overflowY: 'auto',
+                  willChange: 'transform',
+                  contain: 'layout style paint',
+                  transform: 'translateZ(0)',
+                  isolation: 'isolate',
+                  backfaceVisibility: 'hidden'
                 }}>
                   <pre key={`json-display-${validationSnapshot ? 'snapshot' : 'empty'}`} style={{
                     margin: 0,
@@ -912,8 +922,10 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                         const lines = formattedJson.split('\n')
                         const lineToPathMap = buildLineToPathMap(jsonData, lines)
 
-                        // Split into lines and add highlighting
-                        return lines.map((line: string, lineIndex: number) => {
+                        // Split into lines and add highlighting - limit to first 1000 lines for performance
+                        const maxLines = 1000
+                        const limitedLines = lines.slice(0, maxLines)
+                        return limitedLines.map((line: string, lineIndex: number) => {
                           let highlightedLine = line
                           
                           // FIRST: Highlight missing fields (yellow background) - capture entire field including closing quote
@@ -949,7 +961,21 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                           return (
                             <div key={lineIndex} dangerouslySetInnerHTML={{ __html: highlightedLine }} />
                           )
-                        })
+                        }).concat(
+                          lines.length > maxLines ? [
+                            <div key="truncated" style={{ 
+                              padding: '8px', 
+                              background: 'rgba(255,165,0,0.2)', 
+                              border: '1px solid rgba(255,165,0,0.4)',
+                              borderRadius: '4px',
+                              marginTop: '8px',
+                              fontSize: '12px',
+                              color: '#ff9800'
+                            }}>
+                              ⚠️ JSON גדול מדי - מוצגות רק {maxLines} שורות ראשונות מתוך {lines.length}
+                            </div>
+                          ] : []
+                        )
                       } catch (error) {
                         return (
                           <span style={{ color: '#f44336' }}>
@@ -1110,7 +1136,12 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                 marginTop: '0',
                 padding: '32px',
                 height: '800px',
-                overflow: 'auto'
+                overflow: 'auto',
+                willChange: 'transform',
+                contain: 'layout style paint',
+                transform: 'translateZ(0)',
+                isolation: 'isolate',
+                backfaceVisibility: 'hidden'
               }}>
                 {/* Errors Header */}
                 <div style={{
@@ -1146,7 +1177,7 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                   flexDirection: 'column',
                   gap: '12px'
                 }}>
-                  {validationResult.errors.map((error, index) => {
+                  {validationResult.errors.slice(0, 50).map((error, index) => {
                     const isMissingField = error.message.includes('שדה חובה חסר')
                     const errorColor = isMissingField ? 'rgba(255,235,59,0.1)' : 'rgba(244,67,54,0.1)'
                     const borderColor = isMissingField ? 'rgba(255,235,59,0.3)' : 'rgba(244,67,54,0.3)'
@@ -1178,6 +1209,19 @@ export const JsonSchemaValidator: React.FC<JsonSchemaValidatorProps> = ({ onBack
                       </div>
                     )
                   })}
+                  {validationResult.errors.length > 50 && (
+                    <div style={{
+                      padding: '12px',
+                      background: 'rgba(255,165,0,0.1)',
+                      border: '1px solid rgba(255,165,0,0.3)',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      color: '#ff9800',
+                      textAlign: 'center'
+                    }}>
+                      ⚠️ מוצגות רק 50 שגיאות ראשונות מתוך {validationResult.errors.length}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

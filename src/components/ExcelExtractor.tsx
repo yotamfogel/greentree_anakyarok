@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react'
 import { Workbook } from 'exceljs'
 
 function hexToARGB(hex: string): string {
@@ -17,7 +17,7 @@ const CUBE_COLORS = {
   yellow: { bg: '#E6A700' }
 }
 
-export function ExcelExtractor() {
+export const ExcelExtractor = memo(function ExcelExtractor() {
   const fontName = 'Segoe UI'
   const fontSize = 14
   const headerTextColor = '#ffffff'
@@ -1562,5 +1562,5 @@ export function ExcelExtractor() {
       </div>
     </aside>
   )
-}
+})
 

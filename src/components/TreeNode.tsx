@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from 'react'
+import { useMemo, useRef, useState, useEffect, memo } from 'react'
 import { TreeNodeData } from '../utils/parser'
 
 interface TreeNodeProps {
@@ -9,7 +9,7 @@ interface TreeNodeProps {
   forcePreferredSide?: 'left' | 'right'
 }
 
-export function TreeNode({ node, depth, isRoot = false, defaultOpenChildren = false, forcePreferredSide }: TreeNodeProps) {
+export const TreeNode = memo(function TreeNode({ node, depth, isRoot = false, defaultOpenChildren = false, forcePreferredSide }: TreeNodeProps) {
   const [childrenOpen, setChildrenOpen] = useState<boolean>(defaultOpenChildren || depth === 0)
   const [descOpen, setDescOpen] = useState<boolean>(false)
   const [preferredSide, setPreferredSide] = useState<'left' | 'right'>(forcePreferredSide ?? 'right')
@@ -718,5 +718,18 @@ export function TreeNode({ node, depth, isRoot = false, defaultOpenChildren = fa
       )}
     </li>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison to prevent unnecessary re-renders
+  // Re-render only if node identity, depth, or key props change
+  return (
+    prevProps.node.id === nextProps.node.id &&
+    prevProps.depth === nextProps.depth &&
+    prevProps.isRoot === nextProps.isRoot &&
+    prevProps.defaultOpenChildren === nextProps.defaultOpenChildren &&
+    prevProps.forcePreferredSide === nextProps.forcePreferredSide &&
+    prevProps.node.excelMeta === nextProps.node.excelMeta &&
+    prevProps.node.requiredState === nextProps.node.requiredState &&
+    prevProps.node.children === nextProps.node.children
+  )
+})
 

@@ -7,18 +7,31 @@ export default defineConfig({
   build: {
     target: 'es2015',
     minify: 'terser',
+    cssCodeSplit: true,
+    sourcemap: false,
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+        passes: 2
+      },
+      format: {
+        comments: false
+      }
+    },
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
           excel: ['exceljs', 'xlsx'],
-          azure: ['@azure/msal-browser', '@azure/msal-react']
+          azure: ['@azure/msal-browser', '@azure/msal-react'],
+          window: ['react-window']
         }
       }
     }
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'exceljs', 'xlsx']
+    include: ['react', 'react-dom', 'exceljs', 'xlsx', 'react-window']
   }
 })
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react'
+import React, { useMemo, useState, useEffect, useRef, memo } from 'react'
 
 type AvailableSchemas = Record<string, { title: string; schema: any }>
 
@@ -67,8 +67,13 @@ function flattenJsonSchema(schemaKey: string, schemaTitle: string, schema: any):
   return results
 }
 
-// Function to generate consistent colors for families
+// Function to generate consistent colors for families (cached)
+const colorCache = new Map<string, string>()
 const generateFamilyColor = (familyName: string): string => {
+  if (colorCache.has(familyName)) {
+    return colorCache.get(familyName)!
+  }
+  
   const colors = [
     '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
     '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
@@ -83,11 +88,14 @@ const generateFamilyColor = (familyName: string): string => {
     hash = hash & hash // Convert to 32-bit integer
   }
   
-  return colors[Math.abs(hash) % colors.length]
+  const color = colors[Math.abs(hash) % colors.length]
+  colorCache.set(familyName, color)
+  return color
 }
 
-export function ValueList({ schemas }: ValueListProps) {
+export const ValueList = memo(function ValueList({ schemas }: ValueListProps) {
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [selected, setSelected] = useState<FieldEntry | null>(null)
   const [filterType, setFilterType] = useState<'all' | 'fields' | 'hierarchies'>('all')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -97,6 +105,12 @@ export function ValueList({ schemas }: ValueListProps) {
   const filterDropdownRef = useRef<HTMLDivElement>(null)
   const selectedFieldRef = useRef<HTMLButtonElement>(null)
   const schemaDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Debounce the search query for better performance
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 300)
+    return () => clearTimeout(timer)
+  }, [query])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -190,8 +204,8 @@ export function ValueList({ schemas }: ValueListProps) {
       }
     })
     
-    // Apply search filter
-    const q = query.trim().toLowerCase()
+    // Apply search filter (using debounced query for performance)
+    const q = debouncedQuery.trim().toLowerCase()
     if (!q) return filteredFields
     return filteredFields.filter(f => (
       f.path.toLowerCase().includes(q) ||
@@ -200,7 +214,7 @@ export function ValueList({ schemas }: ValueListProps) {
       (f.type ? f.type.toLowerCase().includes(q) : false) ||
       (f.description ? f.description.toLowerCase().includes(q) : false)
     ))
-  }, [allFields, query, filterType, selectedSchema])
+  }, [allFields, debouncedQuery, filterType, selectedSchema])
 
   // Keyboard navigation
   useEffect(() => {
@@ -625,7 +639,7 @@ export function ValueList({ schemas }: ValueListProps) {
       </section>
     </>
   )
-}
+})
 
 export default ValueList
 

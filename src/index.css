@@ -16,10 +16,28 @@
     --accent: #7cc0ff;
     --glow: 0 0 0px rgba(124, 192, 255, 0), 0 0 0px rgba(124, 192, 255, 0);
     --radius: 14px;
+    --blur-amount: 20px; /* Reduced from 40-48px for performance */
   }
 }
 
 @layer base {
+  /* Performance optimizations - reduce motion and effects when needed */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Graceful degradation for backdrop-filter */
+  @supports not (backdrop-filter: blur(20px)) {
+    .app-header, .panel, .value-panel, .excel-extractor {
+      backdrop-filter: none !important;
+      background: rgba(10,24,45,0.95) !important;
+    }
+  }
+
   * { font-family: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
   .page-root {
     background: radial-gradient(1200px 800px at 80% 20%, rgba(124,192,255,0.15), transparent 50%),
@@ -1099,8 +1117,8 @@
   }
 
   /* Modal */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: grid; place-items: center; z-index: 400; }
-  .modal { width: min(900px, 96vw); background: #0f1420; border: 1px solid rgba(255,255,255,0.16); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,0.6); overflow: hidden; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: grid; place-items: center; z-index: 400; will-change: opacity; }
+  .modal { width: min(900px, 96vw); background: #0f1420; border: 1px solid rgba(255,255,255,0.16); border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,0.6); overflow: hidden; will-change: transform, opacity; }
   .mapping-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; align-items: start; }
   .map-col .small-h { font-size: 12px; color: var(--muted); margin-bottom: 6px; text-align: start; }
   .map-card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; padding: 12px; display: grid; gap: 8px; }

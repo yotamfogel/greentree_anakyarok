@@ -394,7 +394,7 @@ function AppContent() {
   }, [isSchemaDropdownOpen])
 
   useEffect(() => {
-    // Highlight matching text in cubes and descriptions
+    // Debounced highlight matching text in cubes and descriptions
     const highlightText = () => {
       // Remove existing highlights
       document.querySelectorAll('.search-highlight').forEach(el => {
@@ -441,7 +441,16 @@ function AppContent() {
       })
     }
 
-    highlightText()
+    // Debounce highlighting with requestIdleCallback for better performance
+    const timeoutId = setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => highlightText())
+      } else {
+        highlightText()
+      }
+    }, 300)
+    
+    return () => clearTimeout(timeoutId)
   }, [searchQuery, tree])
 
   // Build a flat index of fields for search results

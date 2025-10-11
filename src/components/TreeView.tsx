@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { TreeNodeData } from '../utils/parser'
 import { TreeNode } from './TreeNode'
 
@@ -5,7 +6,7 @@ interface TreeViewProps {
   root: TreeNodeData
 }
 
-export function TreeView({ root }: TreeViewProps) {
+export const TreeView = memo(function TreeView({ root }: TreeViewProps) {
   const isComposite = root.children && root.children.length > 0
   
   return (
@@ -18,5 +19,5 @@ export function TreeView({ root }: TreeViewProps) {
       {isComposite ? null : <div className="placeholder">No nested fields</div>}
     </div>
   )
-}
+})
 
