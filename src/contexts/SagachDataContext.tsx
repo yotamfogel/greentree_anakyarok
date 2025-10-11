@@ -78,6 +78,7 @@ export interface SagachimStatusItem {
   lastUpdated: string
   arena: ArenaOption[]
   priority: 'נמוך' | 'בינוני' | 'גבוה' | 'TOP'
+  priorityNumber?: number // Priority number for 'גבוה' priority level
   sagachType?: string // סוג הסג"ח - optional free text field
   processStatus: 1 | 2 | 3 | 4 | 5 | 6 | 7
   processStartDate?: string

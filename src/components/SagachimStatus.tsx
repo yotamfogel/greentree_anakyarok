@@ -258,6 +258,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     provider: '',
     arena: [] as ArenaOption[],
     priority: 'בינוני' as PriorityOption,
+    priorityNumber: undefined as number | undefined,
     sagachType: ''
   })
 
@@ -271,10 +272,6 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     type: 'success',
     isVisible: false
   })
-
-  // Debug: Mock date for testing time-based features
-  const [mockDate, setMockDate] = useState<Date | null>(null)
-  const [isDebugPanelOpen, setIsDebugPanelOpen] = useState<boolean>(false)
 
   // Date editing states
   const [isEditingDate, setIsEditingDate] = useState<boolean>(false)
@@ -291,6 +288,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     provider: '',
     arena: [] as ArenaOption[],
     priority: 'בינוני' as PriorityOption,
+    priorityNumber: undefined as number | undefined,
     sagachType: '',
     processStatus: 1,
     processStartDate: '',
@@ -300,9 +298,9 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   // Force re-render when date changes
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
 
-  // Get current date (mock or real)
+  // Get current date
   const getCurrentDate = () => {
-    return mockDate || new Date()
+    return new Date()
   }
 
   // Date conversion utilities
@@ -498,29 +496,17 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     }
   }, [])
 
-  // Update current date when mock date changes
-  useEffect(() => {
-    if (mockDate) {
-      setCurrentDate(mockDate)
-      console.log('🗓️ Mock date changed to:', mockDate.toISOString())
-    } else {
-      setCurrentDate(new Date())
-    }
-  }, [mockDate])
-
   // Debug log when sagachimStatus changes
   // Debug logging removed for performance
 
   // Update current date every minute to trigger re-renders for time calculations
   useEffect(() => {
     const interval = setInterval(() => {
-      if (!mockDate) {
-        setCurrentDate(new Date())
-      }
+      setCurrentDate(new Date())
     }, 60000) // Update every minute
 
     return () => clearInterval(interval)
-  }, [mockDate])
+  }, [])
 
   // State for tracking time updates without forcing unnecessary re-renders
   const [, timeUpdate] = useState(0)
@@ -587,7 +573,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
 
     // Update time tracking
     timeUpdate(prev => prev + 1)
-  }, [mockDate, currentDate, sagachimStatus.length])
+  }, [currentDate, sagachimStatus.length])
 
   // Calculate days spent in a specific phase
   const calculatePhaseDays = useCallback((phaseData: PhaseData, isCurrentPhase: boolean = false): number => {
@@ -623,7 +609,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     }
 
     return baseTotal
-  }, [mockDate, currentDate]) // This callback will be recreated when mockDate or currentDate changes
+  }, [currentDate]) // This callback will be recreated when currentDate changes
 
   // Calculate date range for a specific phase
   const getPhaseDataRange = useCallback((phaseData: PhaseData, isCurrentPhase: boolean = false): string => {
@@ -1176,6 +1162,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
       provider: selectedSagach.provider,
       arena: [...selectedSagach.arena],
       priority: selectedSagach.priority,
+      priorityNumber: selectedSagach.priorityNumber,
       sagachType: selectedSagach.sagachType || '',
       processStatus: selectedSagach.processStatus,
       processStartDate: selectedSagach.processStartDate ? formatDateForDisplay(selectedSagach.processStartDate) : '',
@@ -1222,6 +1209,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
           provider: editValues.provider.trim(),
           arena: editValues.arena,
           priority: editValues.priority,
+          priorityNumber: editValues.priorityNumber,
           sagachType: editValues.sagachType.trim() || undefined,
           processStartDate: convertedStartDate || undefined,
           attachments: editValues.attachments,
@@ -1233,6 +1221,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
           provider: editValues.provider.trim(),
           arena: editValues.arena,
           priority: editValues.priority,
+          priorityNumber: editValues.priorityNumber,
           processStartDate: convertedStartDate || undefined,
           attachments: editValues.attachments,
           lastUpdated: formatDateWithSlashes(getCurrentDate())
@@ -1392,6 +1381,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
       provider: '',
       arena: [] as ArenaOption[],
       priority: 'בינוני' as PriorityOption,
+      priorityNumber: undefined,
       sagachType: '',
       processStatus: 1,
       processStartDate: '',
@@ -1455,6 +1445,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         lastUpdated: formatDateWithSlashes(getCurrentDate()),
         arena: newSagachForm.arena,
         priority: newSagachForm.priority,
+        priorityNumber: newSagachForm.priorityNumber,
         sagachType: newSagachForm.sagachType.trim() || undefined,
         attachments: [],
         processStatus: 1,
@@ -1485,7 +1476,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
       addSagachimStatus(newSagach);
 
       // Reset form and close popup
-      setNewSagachForm({ name: '', description: '', provider: '', arena: [] as ArenaOption[], priority: 'בינוני' as PriorityOption, sagachType: '' })
+      setNewSagachForm({ name: '', description: '', provider: '', arena: [] as ArenaOption[], priority: 'בינוני' as PriorityOption, priorityNumber: undefined, sagachType: '' })
       setIsNewSagachPopupOpen(false)
 
       // Find and open the new sagach for editing
@@ -1581,142 +1572,6 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
 
   return (
     <>
-      {/* Debug Panel */}
-      <div
-        style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          zIndex: 1000,
-          background: 'rgba(0,0,0,0.8)',
-          borderRadius: '12px',
-          padding: isDebugPanelOpen ? '16px' : '8px',
-          border: '1px solid rgba(255,255,255,0.2)',
-          backdropFilter: 'blur(8px)',
-          transition: 'all 0.3s ease',
-          cursor: 'pointer'
-        }}
-        onClick={() => setIsDebugPanelOpen(!isDebugPanelOpen)}
-        title="לחץ לפתיחת פאנל בדיקת תאריכים"
-      >
-        
-        {isDebugPanelOpen && (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              minWidth: '200px'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              color: 'var(--text)',
-              fontSize: '11px',
-              fontWeight: '600'
-            }}>
-              <span>בדיקת תאריכים</span>
-              <button
-                onClick={() => setIsDebugPanelOpen(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--muted)',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  padding: '0',
-                  width: '16px',
-                  height: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-                title="סגור פאנל"
-              >
-                ×
-              </button>
-            </div>
-
-            <input
-              type="date"
-              value={mockDate?.toISOString().split('T')[0] || ''}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setMockDate(new Date(e.target.value + 'T12:00:00'))
-                } else {
-                  setMockDate(null)
-                }
-              }}
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                background: 'rgba(255,255,255,0.1)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: '6px',
-                padding: '6px 8px',
-                color: 'var(--text)',
-                fontSize: '12px',
-                fontFamily: 'Segoe UI, sans-serif'
-              }}
-            />
-
-            <div style={{
-              fontSize: '10px',
-              color: 'var(--muted)',
-              textAlign: 'center'
-            }}>
-              {mockDate
-                ? `תאריך מדומה: ${formatDateWithSlashes(mockDate)}`
-                : `תאריך אמיתי: ${formatDateWithSlashes(new Date())}`
-              }
-            </div>
-
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setMockDate(null)
-              }}
-              disabled={!mockDate}
-              style={{
-                background: mockDate
-                  ? 'linear-gradient(135deg, rgba(244,67,54,0.8), rgba(244,67,54,0.6))'
-                  : 'rgba(255,255,255,0.1)',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '4px 8px',
-                color: mockDate ? 'white' : 'var(--muted)',
-                fontSize: '10px',
-                fontWeight: '600',
-                cursor: mockDate ? 'pointer' : 'not-allowed'
-              }}
-            >
-              איפוס לתאריך אמיתי
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                clearAllData()
-                window.location.reload()
-              }}
-              style={{
-                background: 'linear-gradient(135deg, rgba(255,152,0,0.8), rgba(255,152,0,0.6))',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '4px 8px',
-                color: 'white',
-                fontSize: '10px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              איפוס נתונים
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* CSS Animations */}
       <style>
         {`
@@ -4281,9 +4136,65 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                       lineHeight: '1.8',
                     }}>
                       {PRIORITY_LABELS[selectedSagach.priority]}
+                      {selectedSagach.priorityNumber && ` (${selectedSagach.priorityNumber})`}
                     </p>
                   )}
                 </div>
+
+                {/* 3b. מספר תעדוף - Only shown when priority is "גבוה" */}
+                {(isEditingDetails && editValues.priority === 'גבוה') || (!isEditingDetails && selectedSagach.priority === 'גבוה' && selectedSagach.priorityNumber) ? (
+                  <div style={{ marginTop: '16px' }}>
+                    <h4 style={{ 
+                      color: 'rgba(124,192,255,0.9)', 
+                      fontSize: '18px', 
+                      fontWeight: '600', 
+                      margin: '0 0 8px 0' 
+                    }}>
+                      מספר תעדוף
+                    </h4>
+                    {isEditingDetails ? (
+                      <input
+                        type="number"
+                        value={editValues.priorityNumber || ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : parseInt(e.target.value)
+                          setEditValues(prev => ({ ...prev, priorityNumber: value }))
+                        }}
+                        placeholder="הזן מספר תעדוף..."
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: '12px',
+                          color: '#ffffff',
+                          fontSize: '16px',
+                          fontFamily: 'Segoe UI, sans-serif',
+                          outline: 'none',
+                          transition: 'all 0.2s ease',
+                          direction: 'rtl',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = 'rgba(124,192,255,0.6)'
+                          e.target.style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = 'rgba(255,255,255,0.2)'
+                          e.target.style.boxShadow = 'none'
+                        }}
+                      />
+                    ) : (
+                      <p style={{ 
+                        fontSize: '18px', 
+                        margin: 0,
+                        lineHeight: '1.8',
+                      }}>
+                        {selectedSagach.priorityNumber || '-'}
+                      </p>
+                    )}
+                  </div>
+                ) : null}
 
                 {/* 3c. סוג הסג"ח */}
                 {(isEditingDetails || selectedSagach.sagachType) && (
@@ -5821,7 +5732,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
       }} onClick={() => {
         if (!isCreateSagachLoading) {
           setIsNewSagachPopupOpen(false)
-          setNewSagachForm({ name: '', description: '', provider: '', arena: [] as ArenaOption[], priority: 'בינוני' as PriorityOption, sagachType: '' })
+          setNewSagachForm({ name: '', description: '', provider: '', arena: [] as ArenaOption[], priority: 'בינוני' as PriorityOption, priorityNumber: undefined, sagachType: '' })
         }
       }}>
         <div style={{
@@ -6332,6 +6243,60 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                 )}
               </div>
             </div>
+
+            {/* Priority Number - Only shown when priority is "גבוה" */}
+            {newSagachForm.priority === 'גבוה' && (
+              <div style={{ marginTop: '16px' }}>
+                <label style={{
+                  display: 'block',
+                  color: 'var(--text)',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  marginBottom: '8px',
+                  direction: 'rtl'
+                }}>
+                  מספר תעדוף (אופציונלי)
+                </label>
+                <input
+                  type="number"
+                  value={newSagachForm.priorityNumber || ''}
+                  onChange={(e) => {
+                    const value = e.target.value === '' ? undefined : parseInt(e.target.value)
+                    setNewSagachForm(prev => ({ ...prev, priorityNumber: value }))
+                  }}
+                  placeholder="הזן מספר תעדוף..."
+                  disabled={isCreateSagachLoading}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '12px',
+                    color: isCreateSagachLoading ? 'rgba(255,255,255,0.5)' : '#ffffff',
+                    fontSize: '14px',
+                    fontFamily: 'Segoe UI, sans-serif',
+                    outline: 'none',
+                    transition: 'all 0.2s ease',
+                    direction: 'rtl',
+                    opacity: isCreateSagachLoading ? 0.6 : 1,
+                    cursor: isCreateSagachLoading ? 'not-allowed' : 'text',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    if (!isCreateSagachLoading) {
+                      e.target.style.borderColor = 'rgba(124,192,255,0.6)'
+                      e.target.style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (!isCreateSagachLoading) {
+                      e.target.style.borderColor = 'rgba(255,255,255,0.2)'
+                      e.target.style.boxShadow = 'none'
+                    }
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -6373,7 +6338,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
               onClick={() => {
                 if (!isCreateSagachLoading) {
                   setIsNewSagachPopupOpen(false)
-                  setNewSagachForm({ name: '', description: '', provider: '', arena: [] as ArenaOption[], priority: 'בינוני' as PriorityOption, sagachType: '' })
+                  setNewSagachForm({ name: '', description: '', provider: '', arena: [] as ArenaOption[], priority: 'בינוני' as PriorityOption, priorityNumber: undefined, sagachType: '' })
                 }
               }}
               disabled={isCreateSagachLoading}
