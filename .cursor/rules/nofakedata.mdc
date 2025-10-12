@@ -1,0 +1,12 @@
+---
+alwaysApply: true
+---
+treeCube is a field in the json schema that is displayed as a cube in the hierarchy tree. fieldCube is a field extracted from the uploaded excel file and it's displayed as a cube in the "excel extractor".
+
+always use Segoe UI font and make hebrew text right-to-left
+
+When adding an ability to edit something in the app, make it only accessable to admins
+
+When creating dropdown buttons, use UI aesthetic from the other dropdown buttons in the app like "priority" 
+
+Remember that this app will be used in a closed network with its own private databases and APIs

@@ -101,7 +101,7 @@ export interface SagachimStatusItem {
   lastModifiedAt: string
 }
 
-interface StatusUpdate {
+export interface StatusUpdate {
   id: string
   message: string
   timestamp: string
@@ -110,6 +110,9 @@ interface StatusUpdate {
   newStatus?: number
   processStatus?: number
   author?: string
+  sagachName?: string
+  arena?: ArenaOption[]
+  provider?: string
 }
 
 

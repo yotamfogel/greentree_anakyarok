@@ -29,6 +29,9 @@ interface StatusUpdate {
   newStatus?: number
   processStatus?: number // The process state when this message was written
   author?: string // Name of the person who wrote the message
+  sagachName?: string
+  arena?: ArenaOption[]
+  provider?: string
 }
 
 const PRIORITY_OPTIONS = ['נמוך', 'בינוני', 'גבוה', 'TOP'] as const
@@ -1266,7 +1269,10 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         oldStatus: selectedSagach.processStatus,
         newStatus: newProcessStatus,
         processStatus: selectedSagach.processStatus,
-        author: user?.name || 'משתמש'
+        author: user?.name || 'משתמש',
+        sagachName: selectedSagach.name,
+        arena: selectedSagach.arena,
+        provider: selectedSagach.provider
       }
     
       // Update phase data when changing status
@@ -1460,7 +1466,10 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
           timestamp: getCurrentDate().toISOString(),
           type: 'system' as const,
           processStatus: 1,
-          author: user?.name || 'משתמש'
+          author: user?.name || 'משתמש',
+          sagachName: newSagachForm.name.trim(),
+          arena: newSagachForm.arena,
+          provider: newSagachForm.provider.trim()
         }],
         phaseData: {
           1: {

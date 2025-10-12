@@ -246,7 +246,9 @@ class NotificationService {
         sagach.name,
         oldStatus,
         currentStatus,
-        changeDescription
+        changeDescription,
+        sagach.provider,
+        sagach.arena
       )
 
       if (result.success) {
