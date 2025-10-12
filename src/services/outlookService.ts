@@ -1,13 +1,37 @@
-import { NotificationSubscriber } from '../contexts/SagachDataContext'
+import { NotificationSubscriber, StatusUpdate, SagachimStatusItem } from '../contexts/SagachDataContext'
+import { generateEmailHTML } from '../utils/emailTemplates'
+
+/**
+ * Check if there were any changes since the last notification sent to the subscriber
+ * @param sagach - The sagach to check for changes
+ * @param subscriber - The subscriber to check for
+ * @returns true if there are changes since last notification, false otherwise
+ */
+export function hasChangesSinceLastNotification(
+  sagach: SagachimStatusItem,
+  subscriber: NotificationSubscriber
+): boolean {
+  // If no last notification time, there are "changes" (first notification)
+  if (!subscriber.lastNotificationSent) {
+    return true
+  }
+
+  const lastNotificationTime = new Date(subscriber.lastNotificationSent)
+  const lastModifiedTime = new Date(sagach.lastModifiedAt)
+
+  // Check if the sagach was modified after the last notification
+  return lastModifiedTime > lastNotificationTime
+}
 
 // Email interface
 export interface NotificationEmail {
   from?: string
   to: string
-  subject: string
-  body: string
   cc?: string[]
   bcc?: string[]
+  subject: string
+  text: string
+  html: string
 }
 
 // API response interface
@@ -34,8 +58,8 @@ class OutlookService {
         cc: email.cc?.join(',') || '',
         bcc: email.bcc?.join(',') || '',
         subject: email.subject,
-        text: email.body.replace(/<[^>]*>/g, ''), // Strip HTML for text version
-        html: email.body
+        text: email.text,
+        html: email.html
       }
 
       const response = await fetch(this.apiEndpoint, {
@@ -80,49 +104,77 @@ class OutlookService {
     sagachName: string,
     oldStatus: string,
     newStatus: string,
-    changeDescription: string,
+    daycount: number,
+    priority: string,
+    hasStatusChanged: boolean,
+    newStatusMessages: Array<{ message: string; timestamp: string; author?: string }>,
     provider?: string,
     arena?: string[]
   ): Promise<EmailApiResponse> {
-    const subject = `עדכון סטטוס סג"ח: ${sagachName}`
+    // Get today's date in format DD/MM/YYYY
+    const todaysdate = new Date().toLocaleDateString('he-IL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    })
 
-    const body = `
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; text-align: right; }
-            .header { background: #f0f8ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-            .content { margin: 20px 0; }
-            .footer { color: #666; font-size: 12px; margin-top: 30px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h2>עדכון סטטוס סג"ח</h2>
-          </div>
+    const subject = `עדכון סטטוס סג"ח יומי - ${sagachName}`
 
-          <div class="content">
-            <p><strong>שם הסג"ח:</strong> ${sagachName}</p>
-            ${provider ? `<p><strong>ספק:</strong> ${provider}</p>` : ''}
-            ${arena && arena.length > 0 ? `<p><strong>זירות:</strong> ${arena.join(', ')}</p>` : ''}
-            <p><strong>סטטוס קודם:</strong> ${oldStatus}</p>
-            <p><strong>סטטוס חדש:</strong> ${newStatus}</p>
-            <p><strong>תיאור השינוי:</strong> ${changeDescription}</p>
-          </div>
+    // Plain text version
+    const text = `
+עדכון סטטוס סג"ח יומי
 
-          <div class="footer">
-            <p>הודעה זו נשלחה אוטומטית ממערכת ניהול הסג"חים</p>
-            <p>לשאלות או בעיות, פנה למנהל המערכת</p>
-          </div>
-        </body>
-      </html>
-    `
+שם הסג"ח: ${sagachName}
+תאריך: ${todaysdate}
+${provider ? `ספק: ${provider}` : ''}
+${arena && arena.length > 0 ? `זירות: ${arena.join(', ')}` : ''}
+
+סטטוס נוכחי: ${newStatus}
+
+כמות ימים בשלב הנוכחי: ${daycount}
+תעדוף: ${priority}
+
+הודעה זו נשלחה אוטומטית ממערכת "העץ הירוק"
+לשאלות או בעיות, פנו ליותם פוגל
+    `.trim()
+
+    // Get current process status number from STATUS_LABELS
+    const statusLabels: Record<number, string> = {
+      1: 'ממתין לבשלות בצד ספק',
+      2: 'ממתין לקבלת דג"ח והתנעה',
+      3: 'בתהליכי אפיון',
+      4: 'ממתין לאינטגרציות',
+      5: 'באינטגרציות',
+      6: 'בתהליכי מבצוע',
+      7: 'מובצע'
+    }
+    
+    // Find current phase number by matching status
+    let currentPhase = 1
+    for (const [key, label] of Object.entries(statusLabels)) {
+      if (label === newStatus) {
+        currentPhase = parseInt(key)
+        break
+      }
+    }
+
+    // Generate HTML using shared template (single source of truth)
+    const html = generateEmailHTML({
+      sagachName,
+      newStatus,
+      daycount,
+      priority,
+      hasStatusChanged,
+      newStatusMessages,
+      notificationFrequency: subscriber.notificationFrequency,
+      currentPhaseNumber: currentPhase
+    })
 
     return await this.sendEmail({
       to: subscriber.userId, // Assuming userId contains email address
       subject,
-      body
+      text,
+      html
     })
   }
 
@@ -134,7 +186,8 @@ class OutlookService {
       const testEmail: NotificationEmail = {
         to: this.fromEmail,
         subject: 'בדיקת חיבור ל-API דואר',
-        body: '<p>זוהי הודעת בדיקה לחיבור ל-API דואר</p>'
+        text: 'זוהי הודעת בדיקה לחיבור ל-API דואר',
+        html: '<p>זוהי הודעת בדיקה לחיבור ל-API דואר</p>'
       }
 
       const result = await this.sendEmail(testEmail)

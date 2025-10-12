@@ -1,6 +1,6 @@
 import { SagachimStatusItem, NotificationSubscriber } from '../contexts/SagachDataContext'
 import { getDatabaseService } from './postgreSQLService'
-import { getOutlookService } from './outlookService'
+import { getOutlookService, hasChangesSinceLastNotification } from './outlookService'
 
 // Notification service configuration
 export interface NotificationConfig {
@@ -26,6 +26,7 @@ class NotificationService {
   private outlookService: any
   private isRunning: boolean = false
   private lastCheckTimestamp: Date = new Date()
+  private last10AMNotificationDate: string = '' // Track last date we sent 10 AM notifications
 
   constructor(config?: Partial<NotificationConfig>) {
     this.config = {
@@ -74,6 +75,24 @@ class NotificationService {
   stop(): void {
     this.isRunning = false
     console.log('🔔 Notification service stopped')
+  }
+
+  /**
+   * Check if current time is 10:00 AM and we haven't sent notifications today yet
+   */
+  private shouldSend10AMNotifications(): boolean {
+    const now = new Date()
+    const currentHour = now.getHours()
+    const currentMinute = now.getMinutes()
+    const currentDate = now.toISOString().split('T')[0]
+
+    // Check if it's between 10:00 AM and 10:05 AM
+    const is10AMWindow = currentHour === 10 && currentMinute >= 0 && currentMinute < 5
+
+    // Check if we haven't sent 10 AM notifications today
+    const notSentToday = this.last10AMNotificationDate !== currentDate
+
+    return is10AMWindow && notSentToday
   }
 
   /**
@@ -195,13 +214,8 @@ class NotificationService {
    */
   private async isDailyNotificationDue(sagach: SagachimStatusItem, subscriber: NotificationSubscriber): Promise<boolean> {
     try {
-      // For now, implement simple logic - send once per day
-      // In a production system, you'd track last notification times per subscriber
-      const now = new Date()
-      const hoursSinceMidnight = now.getHours()
-
-      // Send notifications between 9 AM and 10 AM daily
-      return hoursSinceMidnight >= 9 && hoursSinceMidnight <= 10
+      // Daily notifications are sent at 10:00 AM sharp
+      return this.shouldSend10AMNotifications()
     } catch (error) {
       console.error('❌ Error checking daily notification:', error)
       return false
@@ -213,12 +227,11 @@ class NotificationService {
    */
   private async isWeeklyNotificationDue(sagach: SagachimStatusItem, subscriber: NotificationSubscriber): Promise<boolean> {
     try {
-      // Send weekly notifications on Monday mornings
+      // Send weekly notifications on Sunday at 10:00 AM
       const now = new Date()
       const dayOfWeek = now.getDay() // 0 = Sunday, 1 = Monday, etc.
-      const hours = now.getHours()
 
-      return dayOfWeek === 1 && hours >= 9 && hours <= 10 // Monday 9-10 AM
+      return dayOfWeek === 0 && this.shouldSend10AMNotifications() // Sunday at 10 AM
     } catch (error) {
       console.error('❌ Error checking weekly notification:', error)
       return false
@@ -239,20 +252,76 @@ class NotificationService {
       const currentStatus = STATUS_LABELS[sagach.processStatus] || `סטטוס ${sagach.processStatus}`
       const oldStatus = this.getPreviousStatusLabel(sagach)
 
-      const changeDescription = this.generateChangeDescription(sagach)
+      // Calculate daycount from current phase data
+      const currentPhaseData = sagach.phaseData?.[sagach.processStatus]
+      const daycount = currentPhaseData?.currentEntry?.timeSpentDays || 0
+
+      // Get priority
+      const priority = sagach.priority
+
+      // Check if there were changes since last notification
+      const hasStatusChanged = hasChangesSinceLastNotification(sagach, subscriber)
+
+      // Get new status messages since last notification
+      const lastNotificationTime = subscriber.lastNotificationSent 
+        ? new Date(subscriber.lastNotificationSent) 
+        : new Date(0) // If no previous notification, get all updates
+      
+      // Sort by full timestamp (including seconds/milliseconds) for precise ordering
+      // Display will show HH:mm format without seconds for cleaner presentation
+      const newStatusMessages = (sagach.statusUpdates || [])
+        .filter(update => new Date(update.timestamp) > lastNotificationTime)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) // Oldest first (precise to millisecond)
+        .slice(0, 10) // Limit to 10 oldest updates
+        .map(update => ({
+          message: update.message,
+          timestamp: update.timestamp,
+          author: update.author
+        }))
 
       const result = await this.outlookService.sendSagachNotification(
         subscriber,
         sagach.name,
         oldStatus,
         currentStatus,
-        changeDescription,
+        daycount,
+        priority,
+        hasStatusChanged,
+        newStatusMessages,
         sagach.provider,
         sagach.arena
       )
 
       if (result.success) {
         console.log(`✅ Notification sent to ${subscriber.userName} for ${sagach.name}`)
+        
+        // Mark that we've sent 10 AM notification today (for daily/weekly)
+        if (subscriber.notificationFrequency === 'daily' || subscriber.notificationFrequency === 'weekly') {
+          const now = new Date()
+          const currentHour = now.getHours()
+          if (currentHour === 10) {
+            this.last10AMNotificationDate = now.toISOString().split('T')[0]
+            console.log(`✅ Marked 10 AM notification as sent for ${this.last10AMNotificationDate}`)
+          }
+        }
+
+        // Update subscriber's lastNotificationSent timestamp in database
+        try {
+          const updatedSubscribers = (sagach.notificationSubscribers || []).map(sub => 
+            sub.userId === subscriber.userId 
+              ? { ...sub, lastNotificationSent: new Date().toISOString() }
+              : sub
+          )
+          
+          await this.dbService.updateSagachimStatus(sagach.id, {
+            ...sagach,
+            notificationSubscribers: updatedSubscribers
+          })
+          
+          console.log(`✅ Updated lastNotificationSent for ${subscriber.userName}`)
+        } catch (updateError) {
+          console.error('❌ Failed to update lastNotificationSent:', updateError)
+        }
       } else {
         console.error(`❌ Failed to send notification to ${subscriber.userName}:`, result.error)
       }

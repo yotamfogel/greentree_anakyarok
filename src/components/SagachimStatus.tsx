@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react'
 import { usePermissions } from '../contexts/PermissionContext'
 import { useSagachData, ARENA_OPTIONS, type ArenaOption, type PhaseEntry, type PhaseData, type SagachimStatusItem, type NotificationSubscriber, type FileAttachment } from '../contexts/SagachDataContext'
+import { generateEmailHTML } from '../utils/emailTemplates'
 
 // Custom date formatting function to use '/' instead of '.'
 const formatDateWithSlashes = (date: Date): string => {
@@ -247,6 +248,12 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState<boolean>(false)
   const [notificationMethod, setNotificationMethod] = useState<'email'>('email')
   const [notificationFrequency, setNotificationFrequency] = useState<'daily' | 'weekly' | 'status_change'>('status_change')
+  const [isEmailPreviewOpen, setIsEmailPreviewOpen] = useState<boolean>(false)
+  
+  // Debug modal for date changing
+  const [isDebugDateModalOpen, setIsDebugDateModalOpen] = useState<boolean>(false)
+  const [debugDate, setDebugDate] = useState<string>('')
+  const [debugTimeEnabled, setDebugTimeEnabled] = useState<boolean>(false)
   
   // Loading states for actions
   const [isNotificationToggleLoading, setIsNotificationToggleLoading] = useState<boolean>(false)
@@ -301,8 +308,11 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   // Force re-render when date changes
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
 
-  // Get current date
+  // Get current date (with debug override support)
   const getCurrentDate = () => {
+    if (debugTimeEnabled && debugDate) {
+      return new Date(debugDate)
+    }
     return new Date()
   }
 
@@ -1545,6 +1555,47 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     }
   }
 
+  // Generate email preview HTML using shared template
+  const generateEmailPreviewHTML = (sagach: SagachimStatusItem, frequency: 'daily' | 'weekly' | 'status_change') => {
+    const statusLabels: Record<number, string> = {
+      1: 'ממתין לבשלות בצד ספק',
+      2: 'ממתין לקבלת דג"ח והתנעה',
+      3: 'בתהליכי אפיון',
+      4: 'ממתין לאינטגרציות',
+      5: 'באינטגרציות',
+      6: 'בתהליכי מבצוע',
+      7: 'מובצע'
+    }
+    
+    const currentStatus = statusLabels[sagach.processStatus] || `סטטוס ${sagach.processStatus}`
+    const currentPhaseData = sagach.phaseData?.[sagach.processStatus]
+    const daycount = currentPhaseData?.currentEntry?.timeSpentDays || 0
+    
+    // Get recent status updates for preview (last 5)
+    // Sort by full timestamp (including seconds/milliseconds) for precise ordering
+    // Display will show HH:mm format without seconds for cleaner presentation
+    const recentUpdates = (sagach.statusUpdates || [])
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) // Oldest first (precise to millisecond)
+      .slice(0, 5)
+      .map(update => ({
+        message: update.message,
+        timestamp: update.timestamp,
+        author: update.author
+      }))
+
+    // Use shared email template (single source of truth)
+    return generateEmailHTML({
+      sagachName: sagach.name,
+      newStatus: currentStatus,
+      daycount,
+      priority: sagach.priority,
+      hasStatusChanged: true, // For preview purposes, show the "changed" version
+      newStatusMessages: recentUpdates,
+      notificationFrequency: frequency,
+      currentPhaseNumber: sagach.processStatus
+    })
+  }
+
   const handleNotificationToggle = () => {
     if (!selectedSagach || !user) return
 
@@ -1623,6 +1674,46 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         `}
       </style>
       
+      {/* Floating Debug Button - Admin Only */}
+      {user?.role === 'admin' && (
+        <button
+          onClick={() => setIsDebugDateModalOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: '24px',
+            zIndex: 1000,
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            background: debugTimeEnabled ? 'linear-gradient(135deg, rgba(255,0,0,0.9), rgba(255,0,0,0.7))' : 'linear-gradient(135deg, rgba(124,192,255,0.8), rgba(124,192,255,0.6))',
+            border: debugTimeEnabled ? '2px solid rgba(255,0,0,0.8)' : '2px solid rgba(124,192,255,0.6)',
+            color: 'white',
+            fontSize: '20px',
+            cursor: 'pointer',
+            boxShadow: debugTimeEnabled ? '0 4px 20px rgba(255,0,0,0.5)' : '0 4px 16px rgba(124,192,255,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.3s ease',
+            animation: debugTimeEnabled ? 'pulse 2s infinite' : 'none'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1)'
+            e.currentTarget.style.boxShadow = debugTimeEnabled ? '0 6px 24px rgba(255,0,0,0.6)' : '0 6px 20px rgba(124,192,255,0.5)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)'
+            e.currentTarget.style.boxShadow = debugTimeEnabled ? '0 4px 20px rgba(255,0,0,0.5)' : '0 4px 16px rgba(124,192,255,0.4)'
+          }}
+          title={debugTimeEnabled ? `Debug Mode ON\nDate: ${new Date(debugDate).toLocaleDateString('he-IL')}` : 'Debug Mode - Change Date'}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+          </svg>
+        </button>
+      )}
+
       {/* Fixed Background */}
       <div style={{
         position: 'fixed',
@@ -5638,6 +5729,38 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
             </div>
           </div>
 
+          {/* Preview Email Button */}
+          <div style={{
+            marginBottom: '20px',
+            textAlign: 'center'
+          }}>
+            <button
+              onClick={() => setIsEmailPreviewOpen(true)}
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,165,0,0.8), rgba(255,165,0,0.6))',
+                border: '1px solid rgba(255,165,0,0.8)',
+                borderRadius: '12px',
+                padding: '10px 20px',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                width: '100%'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(255,165,0,0.4)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
+            >
+              👁️ תצוגה מקדימה של המייל
+            </button>
+          </div>
+
           {/* Action Buttons */}
           <div style={{
             display: 'flex',
@@ -5719,6 +5842,410 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
             >
               ביטול
             </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Email Preview Modal */}
+    {isEmailPreviewOpen && selectedSagach && (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        background: 'rgba(0, 0, 0, 0.9)',
+        backdropFilter: 'blur(8px)',
+        zIndex: 1200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'auto'
+      }} onClick={() => setIsEmailPreviewOpen(false)}>
+        <div style={{
+          background: 'var(--bg)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: '20px',
+          padding: '24px',
+          maxWidth: '800px',
+          width: '90%',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          direction: 'rtl'
+        }} onClick={(e) => e.stopPropagation()}>
+          
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '20px',
+            paddingBottom: '16px',
+            borderBottom: '1px solid rgba(255,255,255,0.1)'
+          }}>
+            <h3 style={{
+              color: 'var(--accent)',
+              fontSize: '22px',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              תצוגה מקדימה של המייל
+            </h3>
+            <button
+              onClick={() => setIsEmailPreviewOpen(false)}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                color: 'var(--text)',
+                fontSize: '20px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Email Preview */}
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '16px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
+          }}>
+            <iframe
+              srcDoc={generateEmailPreviewHTML(selectedSagach, notificationFrequency)}
+              style={{
+                width: '100%',
+                height: '600px',
+                border: 'none',
+                borderRadius: '8px'
+              }}
+              title="Email Preview"
+            />
+          </div>
+
+          {/* Footer Buttons */}
+          <div style={{
+            marginTop: '20px',
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'center'
+          }}>
+            <button
+              onClick={() => setIsEmailPreviewOpen(false)}
+              style={{
+                background: 'linear-gradient(135deg, rgba(124,192,255,0.8), rgba(124,192,255,0.6))',
+                border: '1px solid rgba(124,192,255,0.8)',
+                borderRadius: '12px',
+                padding: '12px 24px',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(124,192,255,0.4)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
+            >
+              סגור
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Debug Date Modal - Admin Only */}
+    {isDebugDateModalOpen && user?.role === 'admin' && (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        background: 'rgba(0, 0, 0, 0.9)',
+        backdropFilter: 'blur(8px)',
+        zIndex: 1300,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }} onClick={() => setIsDebugDateModalOpen(false)}>
+        <div style={{
+          background: 'radial-gradient(1200px 800px at 50% 50%, rgba(255,0,0,0.15), transparent 50%), radial-gradient(1000px 700px at 50% 50%, rgba(255, 90, 0, 0.12), transparent 50%), var(--bg)',
+          border: '2px solid rgba(255,0,0,0.4)',
+          borderRadius: '20px',
+          padding: '32px',
+          maxWidth: '500px',
+          width: '90%',
+          boxShadow: '0 8px 32px rgba(255,0,0,0.3)',
+          backdropFilter: 'blur(12px)',
+          direction: 'rtl'
+        }} onClick={(e) => e.stopPropagation()}>
+          
+          {/* Header */}
+          <div style={{
+            textAlign: 'center',
+            marginBottom: '24px',
+            paddingBottom: '16px',
+            borderBottom: '1px solid rgba(255,0,0,0.3)'
+          }}>
+            <h3 style={{
+              color: '#ff4444',
+              fontSize: '24px',
+              fontWeight: '600',
+              margin: '0 0 8px 0'
+            }}>
+              ⚠️ מצב Debug - שינוי תאריך
+            </h3>
+            <p style={{
+              color: 'var(--muted)',
+              fontSize: '14px',
+              margin: 0
+            }}>
+              שימוש למטרות בדיקה בלבד
+            </p>
+          </div>
+
+          {/* Current Date Display */}
+          <div style={{
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '20px'
+          }}>
+            <div style={{
+              display: 'grid',
+              gap: '12px'
+            }}>
+              <div>
+                <div style={{
+                  color: 'var(--muted)',
+                  fontSize: '12px',
+                  marginBottom: '4px'
+                }}>
+                  תאריך אמיתי:
+                </div>
+                <div style={{
+                  color: 'var(--text)',
+                  fontSize: '16px',
+                  fontWeight: '600'
+                }}>
+                  {new Date().toLocaleDateString('he-IL', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    weekday: 'long'
+                  })}
+                </div>
+              </div>
+              {debugTimeEnabled && debugDate && (
+                <div>
+                  <div style={{
+                    color: '#ff4444',
+                    fontSize: '12px',
+                    marginBottom: '4px'
+                  }}>
+                    תאריך Debug (במערכת):
+                  </div>
+                  <div style={{
+                    color: '#ff4444',
+                    fontSize: '16px',
+                    fontWeight: '600'
+                  }}>
+                    {new Date(debugDate).toLocaleDateString('he-IL', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      weekday: 'long'
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Debug Toggle */}
+          <div style={{
+            marginBottom: '20px'
+          }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              padding: '12px',
+              background: debugTimeEnabled ? 'rgba(255,0,0,0.1)' : 'rgba(255,255,255,0.05)',
+              borderRadius: '12px',
+              border: debugTimeEnabled ? '1px solid rgba(255,0,0,0.4)' : '1px solid rgba(255,255,255,0.1)',
+              transition: 'all 0.2s ease'
+            }}>
+              <input
+                type="checkbox"
+                checked={debugTimeEnabled}
+                onChange={(e) => {
+                  setDebugTimeEnabled(e.target.checked)
+                  if (!e.target.checked) {
+                    setDebugDate('')
+                  }
+                }}
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  accentColor: '#ff4444',
+                  cursor: 'pointer'
+                }}
+              />
+              <span style={{ color: debugTimeEnabled ? '#ff4444' : 'var(--text)', fontWeight: '600' }}>
+                הפעל מצב Debug
+              </span>
+            </label>
+          </div>
+
+          {/* Date Picker */}
+          {debugTimeEnabled && (
+            <div style={{
+              marginBottom: '24px',
+              animation: 'slideDown 0.3s ease-out'
+            }}>
+              <label style={{
+                display: 'block',
+                color: 'var(--text)',
+                fontSize: '14px',
+                fontWeight: '600',
+                marginBottom: '8px'
+              }}>
+                בחר תאריך Debug:
+              </label>
+              <input
+                type="date"
+                value={debugDate}
+                onChange={(e) => setDebugDate(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,0,0,0.4)',
+                  borderRadius: '12px',
+                  color: 'var(--text)',
+                  fontSize: '14px',
+                  fontFamily: 'Segoe UI, Arial, sans-serif',
+                  direction: 'ltr'
+                }}
+              />
+              <p style={{
+                color: 'var(--muted)',
+                fontSize: '12px',
+                margin: '8px 0 0 0'
+              }}>
+                המערכת תשתמש בתאריך זה במקום התאריך האמיתי
+              </p>
+            </div>
+          )}
+
+          {/* Warning */}
+          {debugTimeEnabled && (
+            <div style={{
+              background: 'rgba(255,0,0,0.15)',
+              border: '1px solid rgba(255,0,0,0.4)',
+              borderRadius: '12px',
+              padding: '12px',
+              marginBottom: '24px',
+              animation: 'slideDown 0.3s ease-out'
+            }}>
+              <div style={{
+                color: '#ff4444',
+                fontSize: '13px',
+                lineHeight: '1.5'
+              }}>
+                <strong>⚠️ אזהרה:</strong> מצב Debug משנה את התאריך במערכת כולה.
+                זה ישפיע על חישובי ימים, התראות, ותאריכים חדשים שנוצרים.
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'center'
+          }}>
+            <button
+              onClick={() => {
+                setIsDebugDateModalOpen(false)
+                setCurrentDate(new Date()) // Force re-render
+              }}
+              style={{
+                background: debugTimeEnabled && debugDate 
+                  ? 'linear-gradient(135deg, rgba(255,0,0,0.8), rgba(255,0,0,0.6))'
+                  : 'linear-gradient(135deg, rgba(76,175,80,0.8), rgba(76,175,80,0.6))',
+                border: '1px solid ' + (debugTimeEnabled && debugDate ? 'rgba(255,0,0,0.8)' : 'rgba(76,175,80,0.8)'),
+                borderRadius: '12px',
+                padding: '12px 24px',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                flex: 1
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
+            >
+              {debugTimeEnabled && debugDate ? '✅ החל שינויים' : '✅ סגור'}
+            </button>
+            {debugTimeEnabled && (
+              <button
+                onClick={() => {
+                  setDebugTimeEnabled(false)
+                  setDebugDate('')
+                  setCurrentDate(new Date()) // Force re-render
+                  setIsDebugDateModalOpen(false)
+                }}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '12px',
+                  padding: '12px 24px',
+                  color: 'var(--text)',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
+                }}
+              >
+                🔄 איפוס
+              </button>
+            )}
           </div>
         </div>
       </div>

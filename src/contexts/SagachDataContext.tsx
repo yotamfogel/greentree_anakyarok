@@ -122,6 +122,7 @@ export interface NotificationSubscriber {
   notificationMethod: 'email'
   notificationFrequency: 'daily' | 'weekly' | 'status_change'
   subscribedAt: string
+  lastNotificationSent?: string
 }
 
 // Data change events for real-time updates
