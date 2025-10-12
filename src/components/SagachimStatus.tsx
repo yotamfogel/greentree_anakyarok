@@ -2761,28 +2761,6 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
             </div>
 
             {/* Stage Duration Label - Bottom Left */}
-            {stageDurationColor && daysInStage !== null && (
-              <div style={{
-                position: 'absolute',
-                bottom: '12px',
-                left: '12px',
-                background: stageDurationColor.background,
-                color: stageDurationColor.color,
-                padding: '4px 8px',
-                borderRadius: '8px',
-                fontSize: '9px',
-                fontWeight: '700',
-                letterSpacing: '0.3px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '3px',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
-                direction: 'rtl',
-                zIndex: 10
-              }}>
-                {daysInStage} ימים בשלב הנוכחי
-              </div>
-            )}
 
             {isOverdue && (
               <div style={{
@@ -3056,29 +3034,6 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                               }
                             </div>
 
-                            {/* Stage Duration Label - Bottom Left */}
-                            {stageDurationColor && daysInStage !== null && (
-                              <div style={{
-                                position: 'absolute',
-                                bottom: '12px',
-                                left: '12px',
-                                background: stageDurationColor.background,
-                                color: stageDurationColor.color,
-                                padding: '4px 8px',
-                                borderRadius: '8px',
-                                fontSize: '9px',
-                                fontWeight: '700',
-                                letterSpacing: '0.3px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '3px',
-                                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
-                                direction: 'rtl',
-                                zIndex: 10
-                              }}>
-                                {daysInStage} ימים בשלב הנוכחי
-                              </div>
-                            )}
 
                             {isOverdue && (
                               <div style={{
@@ -3327,29 +3282,6 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                       }
                     </div>
 
-                    {/* Stage Duration Label - Bottom Left */}
-                    {stageDurationColor && daysInStage !== null && (
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '12px',
-                        left: '12px',
-                        background: stageDurationColor.background,
-                        color: stageDurationColor.color,
-                        padding: '4px 8px',
-                        borderRadius: '8px',
-                        fontSize: '9px',
-                        fontWeight: '700',
-                        letterSpacing: '0.3px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
-                        direction: 'rtl',
-                        zIndex: 10
-                      }}>
-                        {daysInStage} ימים בשלב הנוכחי
-                      </div>
-                    )}
 
                     {sagach.priority === 'TOP' && (
                       <div style={{
