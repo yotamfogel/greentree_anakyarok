@@ -222,15 +222,15 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
       if (useDatabase && dbService && dbService.isDatabaseConnected()) {
         try {
           if (type === 'sagachs') {
-            // Save each sagach individually to database
+            // # Saving data to Postgres
             await Promise.all(data.map((sagach: SagachTable) => dbService.saveSagach(sagach)))
           } else {
-            // Save each status item individually to database
+            // # Saving data to Postgres
             await Promise.all(data.map((item: SagachimStatusItem) => dbService.saveSagachimStatus(item)))
           }
-          console.log('💾 Data saved to PostgreSQL database')
+          console.log('🐘 💾 Data saved to PostgreSQL database')
         } catch (dbError) {
-          console.error('❌ Failed to save to database, but localStorage saved successfully:', dbError)
+          console.error('🐘 ❌ Failed to save to PostgreSQL, but localStorage saved successfully:', dbError)
           // Don't set error state - localStorage save was successful
         }
       }
@@ -258,12 +258,12 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
       console.error('Failed to store change event:', err)
     }
 
-    // Log to database if available (don't fail if it doesn't work)
+    // # Saving data to Postgres
     if (useDatabase && dbService && dbService.isDatabaseConnected() && user) {
       try {
         await dbService.logDataChange(event.type, event.data, event.userId, event.userName)
       } catch (err) {
-        console.error('Failed to log change to database:', err)
+        console.error('🐘 ❌ Failed to log change to PostgreSQL database:', err)
         // Don't set error state - this is just audit logging
       }
     }
@@ -297,9 +297,9 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
           databaseAvailable = true
           setUseDatabase(true)
           setIsDatabaseConnected(databaseService.isDatabaseConnected())
-          console.log('💾 Using PostgreSQL database for data storage')
+          console.log('🐘 💾 Using PostgreSQL database for data storage')
         } catch (dbError) {
-          console.warn('⚠️ PostgreSQL not available, falling back to localStorage:', dbError)
+          console.warn('🐘 ⚠️ PostgreSQL not available, falling back to localStorage:', dbError)
           setUseDatabase(false)
           setIsDatabaseConnected(false)
           databaseAvailable = false
@@ -308,6 +308,7 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
         // Load data based on availability
         if (databaseAvailable && databaseService) {
           try {
+            // # Fetching data from Postgres
             const [sagachData, statusData] = await Promise.all([
               databaseService.loadSagachs(),
               databaseService.loadSagachimStatus()
@@ -315,9 +316,9 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
 
             setSagachs(sagachData)
             setSagachimStatus(statusData)
-            console.log('✅ Data loaded from PostgreSQL database')
+            console.log('🐘 ✅ Data loaded from PostgreSQL database')
           } catch (dbLoadError) {
-            console.error('❌ Failed to load from database, falling back to localStorage:', dbLoadError)
+            console.error('🐘 ❌ Failed to load from PostgreSQL, falling back to localStorage:', dbLoadError)
             setUseDatabase(false)
             // Fall through to localStorage loading
           }
@@ -402,7 +403,7 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
           const connected = await dbService.refreshConnectionState()
           setIsDatabaseConnected(connected)
         } catch (error) {
-          console.error('❌ Periodic connection check failed:', error)
+          console.error('🐘 ❌ Periodic PostgreSQL connection check failed:', error)
           setIsDatabaseConnected(false)
         }
       }
@@ -525,12 +526,12 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
       return updated
     })
 
-    // Delete from database if available (don't fail if it doesn't work)
+    // # Deleting data from Postgres
     if (useDatabase && dbService && dbService.isDatabaseConnected()) {
       try {
         await dbService.deleteSagach(id)
       } catch (err) {
-        console.error('Failed to delete sagach from database:', err)
+        console.error('🐘 ❌ Failed to delete sagach from PostgreSQL:', err)
         // Don't set error state - localStorage deletion was successful
       }
     }
@@ -625,12 +626,12 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
       return updated
     })
 
-    // Delete from database if available (don't fail if it doesn't work)
+    // # Deleting data from Postgres
     if (useDatabase && dbService && dbService.isDatabaseConnected()) {
       try {
         await dbService.deleteSagachimStatus(id)
       } catch (err) {
-        console.error('Failed to delete status item from database:', err)
+        console.error('🐘 ❌ Failed to delete status item from PostgreSQL:', err)
         // Don't set error state - localStorage deletion was successful
       }
     }
@@ -687,9 +688,9 @@ export const SagachDataProvider: React.FC<SagachDataProviderProps> = ({ children
       try {
         const connected = await dbService.refreshConnectionState()
         setIsDatabaseConnected(connected)
-        console.log('🔄 Database connection state refreshed:', connected)
+        console.log('🐘 🔄 PostgreSQL connection state refreshed:', connected)
       } catch (error) {
-        console.error('❌ Failed to refresh database connection state:', error)
+        console.error('🐘 ❌ Failed to refresh PostgreSQL connection state:', error)
         setIsDatabaseConnected(false)
       }
     }

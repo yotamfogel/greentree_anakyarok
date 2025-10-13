@@ -28,7 +28,7 @@ try {
     QueryResult = pg.QueryResult
   }
 } catch (error) {
-  console.warn('PostgreSQL module not available in browser environment')
+  console.warn('🐘 ⚠️ PostgreSQL module not available in browser environment')
 }
 
 // Safe environment variable access for browser compatibility
@@ -70,7 +70,7 @@ class PostgreSQLService {
   async initialize(): Promise<void> {
     // Check if pg module is available
     if (!Pool || !Client) {
-      throw new Error('PostgreSQL module not available in browser environment. Database features require a Node.js environment.')
+      throw new Error('🐘 PostgreSQL module not available in browser environment. Database features require a Node.js environment.')
     }
 
     try {
@@ -86,9 +86,9 @@ class PostgreSQLService {
       client.release()
 
       this.isConnected = true
-      console.log('✅ PostgreSQL connected successfully')
+      console.log('🐘 ✅ PostgreSQL connected successfully')
     } catch (error) {
-      console.error('❌ PostgreSQL connection failed:', error)
+      console.error('🐘 ❌ PostgreSQL connection failed:', error)
       this.isConnected = false
       throw error
     }
@@ -107,7 +107,7 @@ class PostgreSQLService {
     }
 
     try {
-      // Create sagachim_status table
+      // # Creating tables in Postgres
       await this.pool.query(`
         CREATE TABLE IF NOT EXISTS sagachim_status (
           id VARCHAR(255) PRIMARY KEY,
@@ -164,9 +164,9 @@ class PostgreSQLService {
         )
       `)
 
-      console.log('✅ Database tables created/verified')
+      console.log('🐘 ✅ PostgreSQL tables created/verified')
     } catch (error) {
-      console.error('❌ Failed to create tables:', error)
+      console.error('🐘 ❌ Failed to create PostgreSQL tables:', error)
       throw error
     }
   }
@@ -176,18 +176,20 @@ class PostgreSQLService {
    */
   async loadSagachimStatus(): Promise<SagachimStatusItem[]> {
     if (!Pool || !Client) {
-      throw new Error('PostgreSQL module not available')
+      throw new Error('🐘 PostgreSQL module not available')
     }
 
     if (!this.isConnected || !this.pool) {
-      throw new Error('Database not connected')
+      throw new Error('🐘 PostgreSQL database not connected')
     }
 
     try {
+      // # Fetching data from Postgres
       const result = await this.pool.query('SELECT * FROM sagachim_status ORDER BY last_modified_at DESC')
+      console.log('🐘 📥 Loaded sagachim status from PostgreSQL')
       return result.rows as SagachimStatusItem[]
     } catch (error) {
-      console.error('❌ Failed to load sagachim status:', error)
+      console.error('🐘 ❌ Failed to load sagachim status from PostgreSQL:', error)
       throw error
     }
   }
@@ -197,18 +199,20 @@ class PostgreSQLService {
    */
   async loadSagachs(): Promise<SagachTable[]> {
     if (!Pool || !Client) {
-      throw new Error('PostgreSQL module not available')
+      throw new Error('🐘 PostgreSQL module not available')
     }
 
     if (!this.isConnected || !this.pool) {
-      throw new Error('Database not connected')
+      throw new Error('🐘 PostgreSQL database not connected')
     }
 
     try {
+      // # Fetching data from Postgres
       const result = await this.pool.query('SELECT * FROM sagachs ORDER BY last_modified_at DESC')
+      console.log('🐘 📥 Loaded sagachs from PostgreSQL')
       return result.rows as SagachTable[]
     } catch (error) {
-      console.error('❌ Failed to load sagachs:', error)
+      console.error('🐘 ❌ Failed to load sagachs from PostgreSQL:', error)
       throw error
     }
   }
@@ -218,11 +222,11 @@ class PostgreSQLService {
    */
   async saveSagachimStatus(item: SagachimStatusItem): Promise<void> {
     if (!Pool || !Client) {
-      throw new Error('PostgreSQL module not available')
+      throw new Error('🐘 PostgreSQL module not available')
     }
 
     if (!this.isConnected || !this.pool) {
-      throw new Error('Database not connected')
+      throw new Error('🐘 PostgreSQL database not connected')
     }
 
     try {
@@ -269,9 +273,11 @@ class PostgreSQLService {
         item.createdBy, item.createdAt, item.lastModifiedBy, item.lastModifiedAt
       ]
 
+      // # Saving data to Postgres (also updates existing records)
       await this.pool.query(query, values)
+      console.log('🐘 💾 Saved sagachim status to PostgreSQL')
     } catch (error) {
-      console.error('❌ Failed to save sagachim status:', error)
+      console.error('🐘 ❌ Failed to save sagachim status to PostgreSQL:', error)
       throw error
     }
   }
@@ -281,11 +287,11 @@ class PostgreSQLService {
    */
   async saveSagach(sagach: SagachTable): Promise<void> {
     if (!Pool || !Client) {
-      throw new Error('PostgreSQL module not available')
+      throw new Error('🐘 PostgreSQL module not available')
     }
 
     if (!this.isConnected || !this.pool) {
-      throw new Error('Database not connected')
+      throw new Error('🐘 PostgreSQL database not connected')
     }
 
     try {
@@ -302,13 +308,15 @@ class PostgreSQLService {
           last_modified_at = EXCLUDED.last_modified_at
       `
 
+      // # Saving data to Postgres (also updates existing records)
       await this.pool.query(query, [
         sagach.id, sagach.name, JSON.stringify(sagach.data),
         JSON.stringify(sagach.versions), sagach.currentVersion,
         sagach.createdBy, sagach.createdAt, sagach.lastModifiedBy, sagach.lastModifiedAt
       ])
+      console.log('🐘 💾 Saved sagach to PostgreSQL')
     } catch (error) {
-      console.error('❌ Failed to save sagach:', error)
+      console.error('🐘 ❌ Failed to save sagach to PostgreSQL:', error)
       throw error
     }
   }
@@ -318,18 +326,20 @@ class PostgreSQLService {
    */
   async deleteSagachimStatus(id: string): Promise<void> {
     if (!Pool || !Client) {
-      throw new Error('PostgreSQL module not available')
+      throw new Error('🐘 PostgreSQL module not available')
     }
 
     if (!this.isConnected || !this.pool) {
-      throw new Error('Database not connected')
+      throw new Error('🐘 PostgreSQL database not connected')
     }
 
     
     try {
+      // # Deleting data from Postgres
       await this.pool.query('DELETE FROM sagachim_status WHERE id = $1', [id])
+      console.log('🐘 🗑️ Deleted sagachim status from PostgreSQL')
     } catch (error) {
-      console.error('❌ Failed to delete sagachim status:', error)
+      console.error('🐘 ❌ Failed to delete sagachim status from PostgreSQL:', error)
       throw error
     }
   }
@@ -339,17 +349,19 @@ class PostgreSQLService {
    */
   async deleteSagach(id: string): Promise<void> {
     if (!Pool || !Client) {
-      throw new Error('PostgreSQL module not available')
+      throw new Error('🐘 PostgreSQL module not available')
     }
 
     if (!this.isConnected || !this.pool) {
-      throw new Error('Database not connected')
+      throw new Error('🐘 PostgreSQL database not connected')
     }
 
     try {
+      // # Deleting data from Postgres
       await this.pool.query('DELETE FROM sagachs WHERE id = $1', [id])
+      console.log('🐘 🗑️ Deleted sagach from PostgreSQL')
     } catch (error) {
-      console.error('❌ Failed to delete sagach:', error)
+      console.error('🐘 ❌ Failed to delete sagach from PostgreSQL:', error)
       throw error
     }
   }
@@ -363,12 +375,14 @@ class PostgreSQLService {
     }
 
     try {
+      // # Saving data to Postgres
       await this.pool.query(
         'INSERT INTO data_changes (event_type, event_data, user_id, user_name) VALUES ($1, $2, $3, $4)',
         [eventType, JSON.stringify(eventData), userId, userName]
       )
+      console.log('🐘 📝 Logged data change to PostgreSQL audit trail')
     } catch (error) {
-      console.error('❌ Failed to log data change:', error)
+      console.error('🐘 ❌ Failed to log data change to PostgreSQL:', error)
       // Don't throw - audit logging shouldn't break main functionality
     }
   }
@@ -382,13 +396,15 @@ class PostgreSQLService {
     }
 
     try {
+      // # Fetching data from Postgres
       const result = await this.pool.query(
         'SELECT * FROM data_changes ORDER BY timestamp DESC LIMIT $1',
         [limit]
       )
+      console.log('🐘 📥 Retrieved recent changes from PostgreSQL audit trail')
       return result.rows
     } catch (error) {
-      console.error('❌ Failed to get recent changes:', error)
+      console.error('🐘 ❌ Failed to get recent changes from PostgreSQL:', error)
       return []
     }
   }
@@ -402,10 +418,10 @@ class PostgreSQLService {
         await this.pool.end()
         this.pool = null
         this.isConnected = false
-        console.log('🔒 Database connection closed')
+        console.log('🐘 🔒 PostgreSQL database connection closed')
       }
-    } catch (error) {
-      console.error('❌ Error closing database connection:', error)
+      } catch (error) {
+      console.error('🐘 ❌ Error closing PostgreSQL database connection:', error)
     }
   }
 
@@ -436,9 +452,10 @@ class PostgreSQLService {
       await client.query('SELECT 1')
       client.release()
       this.isConnected = true
+      console.log('🐘 ✅ PostgreSQL connection test successful')
       return true
     } catch (error) {
-      console.error('❌ Connection test failed:', error)
+      console.error('🐘 ❌ PostgreSQL connection test failed:', error)
       this.isConnected = false
       return false
     }
@@ -449,7 +466,7 @@ class PostgreSQLService {
    */
   async updateConfig(newConfig: Partial<DatabaseConfig>): Promise<void> {
     if (!Pool || !Client) {
-      throw new Error('PostgreSQL module not available')
+      throw new Error('🐘 PostgreSQL module not available')
     }
 
     this.config = { ...this.config, ...newConfig }

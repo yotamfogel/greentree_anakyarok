@@ -54,7 +54,7 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({ onConfigChange }
       DB_SSL: config.ssl
     })
 
-    // Update database service configuration
+    // 🐘 Update PostgreSQL database service configuration
     getDatabaseService().updateConfig({
       host: config.host,
       port: parseInt(config.port),
@@ -64,7 +64,7 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({ onConfigChange }
       ssl: config.ssl === 'true'
     })
 
-    alert('Database configuration applied! Please refresh the page for changes to take effect.')
+    alert('🐘 PostgreSQL database configuration applied! Please refresh the page for changes to take effect.')
   }
 
   const handleTestConnection = async () => {
@@ -106,9 +106,9 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({ onConfigChange }
       margin: '20px 0',
       fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif'
     }}>
-      <h3 style={{ marginTop: 0, color: '#333' }}>PostgreSQL Database Configuration</h3>
+      <h3 style={{ marginTop: 0, color: '#333' }}>🐘 PostgreSQL Database Configuration</h3>
       <p style={{ color: '#666', fontSize: '14px' }}>
-        Configure database connection for enhanced data persistence. Leave blank to use localStorage only.
+        Configure PostgreSQL database connection for enhanced data persistence. Leave blank to use localStorage only.
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
@@ -236,7 +236,7 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({ onConfigChange }
             cursor: errors.length > 0 ? 'not-allowed' : 'pointer'
           }}
         >
-          {isTesting ? 'Testing...' : 'Test Connection'}
+          {isTesting ? '🐘 Testing...' : '🐘 Test Connection'}
         </button>
 
         <button

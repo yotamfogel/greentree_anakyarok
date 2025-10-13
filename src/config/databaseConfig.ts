@@ -88,14 +88,14 @@ export const testDatabaseConnection = async (config: DatabaseConfig): Promise<{ 
     const { getDatabaseService } = await import('../services/postgreSQLService')
     const dbService = getDatabaseService()
 
-    // Temporarily update config
+    // 🐘 Temporarily update config and test PostgreSQL connection
     await dbService.updateConfig(config)
 
-    return { success: true, message: 'Database connection successful' }
+    return { success: true, message: '🐘 PostgreSQL connection successful' }
   } catch (error) {
     return {
       success: false,
-      message: `Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      message: `🐘 PostgreSQL connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`
     }
   }
 }

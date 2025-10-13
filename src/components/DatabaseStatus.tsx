@@ -26,11 +26,11 @@ export const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ showDetails = fa
       fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif'
     }}>
       <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-        Storage: {useDatabase ? 'PostgreSQL' : 'LocalStorage'}
+        Storage: {useDatabase ? '🐘 PostgreSQL' : 'LocalStorage'}
       </div>
       {useDatabase && (
         <div style={{ color: isDatabaseConnected ? '#28a745' : '#856404' }}>
-          Status: {isDatabaseConnected ? '✅ Connected' : '⚠️ Connection Failed'}
+          Status: {isDatabaseConnected ? '🐘 ✅ Connected' : '🐘 ⚠️ Connection Failed'}
         </div>
       )}
     </div>

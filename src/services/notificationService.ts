@@ -123,7 +123,7 @@ class NotificationService {
    */
   private async checkAndSendNotifications(): Promise<void> {
     try {
-      // Load all sagachim status items
+      // # Fetching data from Postgres
       const sagachim = await this.dbService.loadSagachimStatus()
 
       for (const sagach of sagachim) {
@@ -305,7 +305,7 @@ class NotificationService {
           }
         }
 
-        // Update subscriber's lastNotificationSent timestamp in database
+        // # Updating data in Postgres
         try {
           const updatedSubscribers = (sagach.notificationSubscribers || []).map(sub => 
             sub.userId === subscriber.userId 
@@ -318,9 +318,9 @@ class NotificationService {
             notificationSubscribers: updatedSubscribers
           })
           
-          console.log(`✅ Updated lastNotificationSent for ${subscriber.userName}`)
+          console.log(`🐘 ✅ Updated lastNotificationSent in PostgreSQL for ${subscriber.userName}`)
         } catch (updateError) {
-          console.error('❌ Failed to update lastNotificationSent:', updateError)
+          console.error('🐘 ❌ Failed to update lastNotificationSent in PostgreSQL:', updateError)
         }
       } else {
         console.error(`❌ Failed to send notification to ${subscriber.userName}:`, result.error)
