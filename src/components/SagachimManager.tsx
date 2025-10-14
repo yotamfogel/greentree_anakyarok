@@ -44,6 +44,7 @@ export const SagachimManager = () => {
   const [newSagachName, setNewSagachName] = useState<string>('')
   const [newSagachDescription, setNewSagachDescription] = useState<string>('')
   const [newSagachCategory, setNewSagachCategory] = useState<string>('')
+  const [newSagachType, setNewSagachType] = useState<string>('')
   const [isVersionsPanelCollapsed, setIsVersionsPanelCollapsed] = useState<boolean>(true)
   const [isVersionSelected, setIsVersionSelected] = useState<boolean>(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false)
@@ -210,6 +211,7 @@ export const SagachimManager = () => {
       setNewSagachName('')
       setNewSagachDescription('')
       setNewSagachCategory('')
+      setNewSagachType('')
       setIsCreatingNewSagach(false)
     }
   }
@@ -1448,6 +1450,70 @@ export const SagachimManager = () => {
                 />
               </div>
 
+              {/* Sagach Type Field - Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{
+                  color: 'var(--text)',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  direction: 'rtl'
+                }}>
+                  סוג סג"ח
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <select
+                    value={newSagachType}
+                    onChange={(e) => setNewSagachType(e.target.value)}
+                    style={{
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: '12px',
+                      padding: '14px 16px',
+                      color: newSagachType ? 'var(--text)' : 'var(--muted)',
+                      fontSize: '16px',
+                      direction: 'rtl',
+                      outline: 'none',
+                      fontFamily: 'Segoe UI, sans-serif',
+                      transition: 'all 0.2s ease',
+                      width: '100%',
+                      cursor: 'pointer',
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none',
+                      paddingLeft: '40px'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = 'rgba(124,192,255,0.6)'
+                      e.target.style.boxShadow = '0 0 20px rgba(124,192,255,0.3)'
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'rgba(255,255,255,0.2)'
+                      e.target.style.boxShadow = 'none'
+                    }}
+                  >
+                    <option value="" disabled style={{ background: 'var(--bg)', color: 'var(--muted)' }}>
+                      בחר סוג סג"ח
+                    </option>
+                    <option value="GPS" style={{ background: 'var(--bg)', color: 'var(--text)' }}>GPS</option>
+                    <option value="WIFI" style={{ background: 'var(--bg)', color: 'var(--text)' }}>WIFI</option>
+                    <option value="סלולאר" style={{ background: 'var(--bg)', color: 'var(--text)' }}>סלולאר</option>
+                    <option value="אקוסטיקה" style={{ background: 'var(--bg)', color: 'var(--text)' }}>אקוסטיקה</option>
+                    <option value="אפליקציות" style={{ background: 'var(--bg)', color: 'var(--text)' }}>אפליקציות</option>
+                  </select>
+                  <div style={{
+                    position: 'absolute',
+                    left: '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    color: 'var(--accent)',
+                    fontSize: '12px'
+                  }}>
+                    ▼
+                  </div>
+                </div>
+              </div>
+
               {/* Excel Upload Section */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{
@@ -1554,6 +1620,7 @@ export const SagachimManager = () => {
                   setNewSagachName('')
                   setNewSagachDescription('')
                   setNewSagachCategory('')
+                  setNewSagachType('')
                 }}
                 style={{
                   background: 'transparent',

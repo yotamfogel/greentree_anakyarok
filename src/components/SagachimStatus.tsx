@@ -36,9 +36,10 @@ interface StatusUpdate {
 }
 
 const PRIORITY_OPTIONS = ['נמוך', 'בינוני', 'גבוה', 'TOP'] as const
-type PriorityOption = typeof PRIORITY_OPTIONS[number]
+type PriorityOption = typeof PRIORITY_OPTIONS[number] | ''
 
 const PRIORITY_LABELS: Record<PriorityOption, string> = {
+  '': 'בחר תעדוף',
   'נמוך': 'נמוך',
   'בינוני': 'בינוני',
   'גבוה': 'גבוה',
@@ -236,10 +237,11 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   const [isProviderDropdownOpen, setIsProviderDropdownOpen] = useState<boolean>(false)
   const [isArenaDropdownOpen, setIsArenaDropdownOpen] = useState<boolean>(false)
   const [isProcessStatusDropdownOpen, setIsProcessStatusDropdownOpen] = useState<boolean>(false)
-  const [isSagachTypeDropdownOpen, setIsSagachTypeDropdownOpen] = useState<boolean>(false)
   const [isStatusEditDropdownOpen, setIsStatusEditDropdownOpen] = useState<boolean>(false)
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState<boolean>(false)
   const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState<boolean>(false)
+  const [isSagachTypeDropdownOpen, setIsSagachTypeDropdownOpen] = useState<boolean>(false)
+  const [isNewSagachTypeDropdownOpen, setIsNewSagachTypeDropdownOpen] = useState<boolean>(false)
   const [isEditArenaDropdownOpen, setIsEditArenaDropdownOpen] = useState<boolean>(false)
   const [isNewArenaDropdownOpen, setIsNewArenaDropdownOpen] = useState<boolean>(false)
   const [isNewProviderDropdownOpen, setIsNewProviderDropdownOpen] = useState<boolean>(false)
@@ -267,7 +269,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     description: '',
     provider: '',
     arena: [] as ArenaOption[],
-    priority: 'בינוני' as PriorityOption,
+    priority: '' as PriorityOption,
     priorityNumber: undefined as number | undefined,
     sagachType: ''
   })
@@ -297,7 +299,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     description: '',
     provider: '',
     arena: [] as ArenaOption[],
-    priority: 'בינוני' as PriorityOption,
+    priority: '' as PriorityOption,
     priorityNumber: undefined as number | undefined,
     sagachType: '',
     processStatus: 1,
@@ -683,6 +685,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         setIsArenaDropdownOpen(false)
         setIsProcessStatusDropdownOpen(false)
         setIsSagachTypeDropdownOpen(false)
+        setIsNewSagachTypeDropdownOpen(false)
         setIsStatusEditDropdownOpen(false)
         setIsSortDropdownOpen(false)
         setIsPriorityDropdownOpen(false)
@@ -1187,6 +1190,13 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
   const handleSaveDetails = async () => {
     if (!selectedSagach) return
 
+    // Validation
+    if (!editValues.description.trim() || !editValues.provider.trim() || 
+        editValues.arena.length === 0 || !editValues.priority || !editValues.sagachType) {
+      alert('יש למלא את כל השדות הדרושים')
+      return
+    }
+
     try {
       // Check if process status has changed to apply status change logic
       const hasProcessStatusChanged = editValues.processStatus !== selectedSagach.processStatus
@@ -1223,7 +1233,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
           arena: editValues.arena,
           priority: editValues.priority,
           priorityNumber: editValues.priorityNumber,
-          sagachType: editValues.sagachType.trim() || undefined,
+          sagachType: editValues.sagachType.trim(),
           processStartDate: convertedStartDate || undefined,
           attachments: editValues.attachments,
           lastUpdated: formatDateWithSlashes(getCurrentDate())
@@ -1240,11 +1250,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
           lastUpdated: formatDateWithSlashes(getCurrentDate())
         }
         
-        if (editValues.sagachType.trim()) {
-          updates.sagachType = editValues.sagachType.trim()
-        } else {
-          updates.sagachType = undefined
-        }
+        updates.sagachType = editValues.sagachType.trim()
         
         updateSagachimStatus(selectedSagach.id, updates)
         
@@ -1396,7 +1402,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
       description: '',
       provider: '',
       arena: [] as ArenaOption[],
-      priority: 'בינוני' as PriorityOption,
+      priority: '' as PriorityOption,
       priorityNumber: undefined,
       sagachType: '',
       processStatus: 1,
@@ -1438,7 +1444,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
 
     // Validation
     if (!newSagachForm.name.trim() || !newSagachForm.description.trim() || 
-        !newSagachForm.provider.trim() || newSagachForm.arena.length === 0 || !newSagachForm.priority) {
+        !newSagachForm.provider.trim() || newSagachForm.arena.length === 0 || !newSagachForm.priority || !newSagachForm.sagachType) {
       alert('יש למלא את כל השדות הדרושים')
       return
     }
@@ -1462,7 +1468,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         arena: newSagachForm.arena,
         priority: newSagachForm.priority,
         priorityNumber: newSagachForm.priorityNumber,
-        sagachType: newSagachForm.sagachType.trim() || undefined,
+        sagachType: newSagachForm.sagachType.trim(),
         attachments: [],
         processStatus: 1,
         processStartDate: getCurrentDate().toISOString().split('T')[0],
@@ -4126,7 +4132,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                           backdropFilter: 'blur(8px)',
                           overflow: 'hidden'
                         }}>
-                          {PRIORITY_OPTIONS.map(option => (
+                          {(['', ...PRIORITY_OPTIONS] as PriorityOption[]).map(option => (
                             <div
                               key={`edit-priority-${option}`}
                               onClick={() => {
@@ -4154,7 +4160,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                                 }
                               }}
                             >
-                              <span>{option === 'TOP' ? 'TOP' : option}</span>
+                              <span>{PRIORITY_LABELS[option]}</span>
                               {option === editValues.priority && <span>✓</span>}
                             </div>
                           ))}
@@ -4229,45 +4235,101 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                 ) : null}
 
                 {/* 3c. סוג הסג"ח */}
-                {(isEditingDetails || selectedSagach.sagachType) && (
-                  <div>
-                    <h4 style={{ 
-                      color: 'rgba(124,192,255,0.9)', 
-                      fontSize: '18px', 
-                      fontWeight: '600', 
-                      margin: '0 0 8px 0' 
-                    }}>
-                      סוג הסג"ח
-                    </h4>
-                    {isEditingDetails ? (
-                      <input
-                        type="text"
-                        value={editValues.sagachType}
-                        onChange={(e) => setEditValues(prev => ({ ...prev, sagachType: e.target.value }))}
-                        placeholder="הכנס סוג הסג'ח (אופציונלי)..."
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          background: 'rgba(255,255,255,0.08)',
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          borderRadius: '12px',
-                          color: 'var(--text)',
-                          fontSize: '18px',
-                          fontFamily: 'Segoe UI, sans-serif',
-                          outline: 'none',
-                          transition: 'all 0.2s ease',
-                          direction: 'rtl',
-                          boxSizing: 'border-box'
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.borderColor = 'rgba(124,192,255,0.6)'
-                          e.target.style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.borderColor = 'rgba(255,255,255,0.2)'
-                          e.target.style.boxShadow = 'none'
-                        }}
-                      />
+                <div>
+                  <h4 style={{ 
+                    color: 'rgba(124,192,255,0.9)', 
+                    fontSize: '18px', 
+                    fontWeight: '600', 
+                    margin: '0 0 8px 0' 
+                  }}>
+                    סוג הסג"ח *
+                  </h4>
+                  {isEditingDetails ? (
+                    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
+                        <button
+                          type="button"
+                          onClick={() => setIsSagachTypeDropdownOpen(prev => !prev)}
+                          style={{
+                            appearance: 'none',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            background: 'rgba(255,255,255,0.08)',
+                            borderRadius: '12px',
+                            color: '#ffffff',
+                            padding: '12px 16px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            direction: 'rtl',
+                            outline: 'none',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            width: '100%',
+                            fontFamily: 'Segoe UI, sans-serif',
+                            boxSizing: 'border-box'
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.target as HTMLButtonElement).style.transform = 'translateY(-1px)'
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.target as HTMLButtonElement).style.transform = 'translateY(0px)'
+                          }}
+                        >
+                          <span>{editValues.sagachType || 'בחר סוג סג"ח *'}</span>
+                          <span style={{ marginLeft: '8px' }}>▼</span>
+                        </button>
+                        
+                        {isSagachTypeDropdownOpen && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            background: 'var(--panel)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '12px',
+                            marginTop: '4px',
+                            zIndex: 1000,
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                            backdropFilter: 'blur(8px)'
+                          }}>
+                            {['GPS', 'WIFI', 'סלולאר', 'אקוסטיקה', 'אפליקציות'].map((type) => (
+                              <div
+                                key={type}
+                                onClick={() => {
+                                  setEditValues(prev => ({ ...prev, sagachType: type }))
+                                  setIsSagachTypeDropdownOpen(false)
+                                }}
+                                style={{
+                                  padding: '8px 12px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                                  transition: 'background 0.2s ease',
+                                  fontSize: '14px',
+                                  color: editValues.sagachType === type ? 'var(--accent)' : '#ffffff',
+                                  background: editValues.sagachType === type ? 'rgba(124,192,255,0.1)' : 'transparent',
+                                  textAlign: 'center',
+                                  direction: 'rtl'
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (editValues.sagachType !== type) {
+                                    e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (editValues.sagachType !== type) {
+                                    e.currentTarget.style.background = 'transparent'
+                                  }
+                                }}
+                              >
+                                {type}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <p style={{ 
                         color: 'var(--text)', 
@@ -4279,7 +4341,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                       </p>
                     )}
                   </div>
-                )}
+                </div>
 
                 {/* 3d. שלב בתהליך */}
                 <div>
@@ -5490,7 +5552,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
         </div>
       </div>
     )}
-    
+
     {/* Notification Settings Popup */}
     {isNotificationSettingsOpen && (
       <div style={{
@@ -6352,43 +6414,103 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                 fontWeight: '600',
                 marginBottom: '8px'
               }}>
-                סוג הסג"ח
+                סוג הסג"ח *
               </label>
-              <input
-                type="text"
-                value={newSagachForm.sagachType}
-                onChange={(e) => setNewSagachForm(prev => ({ ...prev, sagachType: e.target.value }))}
-                placeholder="הכנס סוג הסג'ח (אופציונלי)..."
-                disabled={isCreateSagachLoading}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  background: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '12px',
-                  color: 'var(--text)',
-                  fontSize: '14px',
-                  fontFamily: 'Segoe UI, sans-serif',
-                  outline: 'none',
-                  transition: 'all 0.2s ease',
-                  direction: 'rtl',
-                  opacity: isCreateSagachLoading ? 0.6 : 1,
-                  cursor: isCreateSagachLoading ? 'not-allowed' : 'text',
-                  boxSizing: 'border-box'
-                }}
-                onFocus={(e) => {
-                  if (!isCreateSagachLoading) {
-                    e.target.style.borderColor = 'rgba(124,192,255,0.6)'
-                    e.target.style.boxShadow = '0 0 0 3px rgba(124,192,255,0.1)'
-                  }
-                }}
-                onBlur={(e) => {
-                  if (!isCreateSagachLoading) {
-                    e.target.style.borderColor = 'rgba(255,255,255,0.2)'
-                    e.target.style.boxShadow = 'none'
-                  }
-                }}
-              />
+              <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()} data-dropdown-container>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isCreateSagachLoading) {
+                      setIsNewSagachTypeDropdownOpen(prev => !prev)
+                    }
+                  }}
+                  disabled={isCreateSagachLoading}
+                  style={{
+                    appearance: 'none',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'rgba(255,255,255,0.08)',
+                    borderRadius: '12px',
+                    color: isCreateSagachLoading ? 'rgba(255,255,255,0.5)' : '#ffffff',
+                    padding: '12px 16px',
+                    cursor: isCreateSagachLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    direction: 'rtl',
+                    outline: 'none',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    fontFamily: 'Segoe UI, sans-serif',
+                    opacity: isCreateSagachLoading ? 0.6 : 1,
+                    boxSizing: 'border-box'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isCreateSagachLoading) {
+                      (e.target as HTMLButtonElement).style.transform = 'translateY(-1px)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isCreateSagachLoading) {
+                      (e.target as HTMLButtonElement).style.transform = 'translateY(0px)'
+                    }
+                  }}
+                >
+                  <span>{newSagachForm.sagachType || 'בחר סוג סג"ח *'}</span>
+                  <span style={{ marginLeft: '8px' }}>▼</span>
+                </button>
+                
+                {isNewSagachTypeDropdownOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'var(--panel)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '12px',
+                    marginTop: '4px',
+                    zIndex: 1000,
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                    backdropFilter: 'blur(8px)'
+                  }}>
+                    {['GPS', 'WIFI', 'סלולאר', 'אקוסטיקה', 'אפליקציות'].map((type) => (
+                      <div
+                        key={type}
+                        onClick={() => {
+                          setNewSagachForm(prev => ({ ...prev, sagachType: type }))
+                          setIsNewSagachTypeDropdownOpen(false)
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid rgba(255,255,255,0.06)',
+                          transition: 'background 0.2s ease',
+                          fontSize: '14px',
+                          color: newSagachForm.sagachType === type ? 'var(--accent)' : '#ffffff',
+                          background: newSagachForm.sagachType === type ? 'rgba(124,192,255,0.1)' : 'transparent',
+                          textAlign: 'center',
+                          direction: 'rtl'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (newSagachForm.sagachType !== type) {
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (newSagachForm.sagachType !== type) {
+                            e.currentTarget.style.background = 'transparent'
+                          }
+                        }}
+                      >
+                        {type}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Provider, Arena & Priority Row */}
@@ -6657,7 +6779,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                     }
                   }}
                 >
-                  <span>{newSagachForm.priority}</span>
+                  <span>{PRIORITY_LABELS[newSagachForm.priority]}</span>
                   <span style={{ fontSize: '12px', marginLeft: '8px' }}>▼</span>
                 </button>
                 {isPriorityDropdownOpen && (
@@ -6674,7 +6796,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                     backdropFilter: 'blur(8px)',
                     overflow: 'hidden'
                   }}>
-                    {PRIORITY_OPTIONS.map(option => (
+                    {(['', ...PRIORITY_OPTIONS] as PriorityOption[]).map(option => (
                       <div
                         key={option}
                         onClick={(e) => {
@@ -6703,7 +6825,7 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
                           }
                         }}
                       >
-                        <span>{option}</span>
+                        <span>{PRIORITY_LABELS[option]}</span>
                         {option === 'TOP' && <span style={{ fontSize: '12px', color: 'var(--accent)' }}>🔥</span>}
                       </div>
                     ))}
@@ -6902,6 +7024,8 @@ const getDefaultSagachim = (): SagachimStatusItem[] => []
     </style>
     </>
   )
-})
+}
 
 SagachimStatus.displayName = 'SagachimStatus'
+
+export default SagachimStatus
